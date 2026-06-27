@@ -78,7 +78,39 @@ TO authenticated
 USING (bucket_id = 'fotos-personas');
 
 
--- 6. Insertar Datos de Demostracion ficticios (Opcional, borrar si no se desea)
+-- 6. Indices de rendimiento para busqueda y filtros
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- Default sort (estado ASC, fecha_registro DESC) y queries COUNT de stats
+CREATE INDEX IF NOT EXISTS idx_personas_estado_fecha
+  ON public.personas (estado, fecha_registro DESC);
+
+-- Filtros de rango de edad y ORDER BY edad
+CREATE INDEX IF NOT EXISTS idx_personas_edad
+  ON public.personas (edad)
+  WHERE edad IS NOT NULL;
+
+-- Busqueda por prefijo de nombre (ILIKE 'query%') y ORDER BY nombre
+CREATE INDEX IF NOT EXISTS idx_personas_nombre_btree
+  ON public.personas (nombre);
+
+-- Busqueda por contenido en nombre (ILIKE '%query%')
+CREATE INDEX IF NOT EXISTS idx_personas_nombre_trgm
+  ON public.personas USING GIN (nombre gin_trgm_ops);
+
+-- Busqueda por contenido en cedula (ILIKE '%query%')
+CREATE INDEX IF NOT EXISTS idx_personas_cedula_trgm
+  ON public.personas USING GIN (cedula gin_trgm_ops);
+
+-- Filtros de ubicacion (tipoUbicacion y texto libre)
+CREATE INDEX IF NOT EXISTS idx_personas_ultima_ubicacion_trgm
+  ON public.personas USING GIN (ultima_ubicacion gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_personas_ubicacion_encontrado_trgm
+  ON public.personas USING GIN (ubicacion_encontrado gin_trgm_ops);
+
+
+-- 7. Insertar Datos de Demostracion ficticios (Opcional, borrar si no se desea)
 INSERT INTO public.personas (nombre, cedula, edad, ultima_ubicacion, telefono_contacto, observaciones, estado, ubicacion_encontrado)
 VALUES 
 ('Persona Demo 001', 'V-00000001', 34, 'Ubicacion demo', '0000-0000000', 'Registro ficticio para pruebas locales.', 'Desaparecido', NULL),
