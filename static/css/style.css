@@ -906,7 +906,7 @@ textarea.form-control {
 }
 
 .toast {
-    background: #1e293b;
+    background: white;
     border: 1px solid var(--glass-border);
     border-left: 4px solid var(--accent);
     border-radius: 12px;
