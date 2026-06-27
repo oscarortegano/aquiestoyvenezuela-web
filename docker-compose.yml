@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  apoyo-terremoto:
+    build: .
+    container_name: apoyo-terremoto-web
+    ports:
+      - "80:80"  # Mapea el puerto 80 del servidor al puerto 80 de Nginx
+    restart: always

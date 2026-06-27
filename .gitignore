@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.DS_Store
+static/js/config.js
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+backups/
+node_modules/
+dist/
+build/

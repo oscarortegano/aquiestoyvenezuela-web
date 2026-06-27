@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQUIESTOYVENEZUELA.COM | Registro y Búsqueda de Personas</title>
+    <meta name="description" content="Plataforma ciudadana para el reporte, búsqueda y localización de personas desaparecidas tras emergencias en Venezuela. Ayúdanos a reunir familias.">
+    <link rel="stylesheet" href="static/css/style.css?v=8">
+</head>
+<body>
+
+    <!-- Header Section -->
+    <header>
+        <div class="logo-container">
+            <img src="static/img/logo.png" alt="Aquí Estoy Venezuela" class="logo-img">
+            <div class="logo-dots">
+                <span class="logo-dot-flag yellow"></span>
+                <span class="logo-dot-flag blue"></span>
+                <span class="logo-dot-flag red"></span>
+            </div>
+        </div>
+        <p>Plataforma para el reporte, búsqueda y localización de personas. Por favor, realiza una búsqueda antes de registrar un nuevo reporte.</p>
+        
+        <!-- Stats Dashboard -->
+        <div class="stats-grid">
+            <div class="stat-card total" id="stat-total-card">
+                <div class="stat-value" id="stat-total">-</div>
+                <div class="stat-label">Reportados</div>
+            </div>
+            <div class="stat-card missing" id="stat-missing-card">
+                <div class="stat-value" id="stat-missing">-</div>
+                <div class="stat-label">Buscados</div>
+            </div>
+            <div class="stat-card found" id="stat-found-card">
+                <div class="stat-value" id="stat-found">-</div>
+                <div class="stat-label">Localizados</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Admin elements (hidden by default, shown when logged in via /admin) -->
+    <span id="admin-indicator" style="display:none;"></span>
+    <div id="admin-panel" style="display:none;"></div>
+
+    <!-- Main Container -->
+    <main class="container">
+        <!-- Actions & Search Bar Area -->
+        <div class="search-section-wrapper">
+            <div class="search-wrapper">
+                <input type="text" id="search-input" class="search-input" placeholder="Ingresa el nombre o número de cédula para buscar...">
+                <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </div>
+            
+            <!-- Botón de Búsqueda manual iluminado -->
+            <div class="search-btn-container" id="search-btn-container" style="display: none; text-align: center; margin-top: 0.25rem;">
+                <button class="btn btn-primary btn-glow" id="btn-run-search" style="padding: 0.9rem 2.5rem; font-size: 1rem; border-radius: 14px; width: 100%;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem;">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    Buscar Persona
+                </button>
+            </div>
+            
+            <!-- Filters Bar (Only shown when searching or viewing full list) -->
+            <div class="filters-bar" id="filters-bar" style="display: none;">
+                <div class="filter-group">
+                    <span class="filter-label">Encontrar por:</span>
+                    <div class="filter-options" id="category-filters">
+                        <label class="filter-chip active" id="chip-all">
+                            <input type="radio" name="search-category" value="all" checked hidden>Todo
+                        </label>
+                        <label class="filter-chip" id="chip-cedula">
+                            <input type="radio" name="search-category" value="cedula" hidden>Cédula
+                        </label>
+                        <label class="filter-chip" id="chip-nombre">
+                            <input type="radio" name="search-category" value="nombre" hidden>Nombre
+                        </label>
+                        <label class="filter-chip" id="chip-apellido">
+                            <input type="radio" name="search-category" value="apellido" hidden>Apellido
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="filter-group">
+                    <span class="filter-label">Estado:</span>
+                    <div class="filter-options" id="status-filters">
+                        <label class="filter-chip active" id="chip-status-all">
+                            <input type="radio" name="status-filter" value="all" checked hidden>Todos
+                        </label>
+                        <label class="filter-chip" id="chip-status-missing">
+                            <input type="radio" name="status-filter" value="Desaparecido" hidden>Desaparecidos
+                        </label>
+                        <label class="filter-chip" id="chip-status-found">
+                            <input type="radio" name="status-filter" value="Encontrado" hidden>Encontrados
+                        </label>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <span class="filter-label">Edad:</span>
+                    <select id="filter-edad" class="filter-select">
+                        <option value="all">Cualquier edad</option>
+                        <option value="child">Niños (0-12)</option>
+                        <option value="teen">Adolescentes (13-17)</option>
+                        <option value="adult">Adultos (18-59)</option>
+                        <option value="senior">Adultos Mayores (60+)</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <span class="filter-label">Ordenar por:</span>
+                    <select id="filter-orden" class="filter-select">
+                        <option value="recientes">Reportes recientes</option>
+                        <option value="nombre_asc">Nombre (A-Z)</option>
+                        <option value="edad_asc">Edad (Menor a Mayor)</option>
+                        <option value="edad_desc">Edad (Mayor a Menor)</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <span class="filter-label">Tipo de lugar:</span>
+                    <select id="filter-tipo-ubicacion" class="filter-select">
+                        <option value="all">Cualquier lugar</option>
+                        <option value="hospital">Hospitales / Clínicas</option>
+                        <option value="refugio">Refugios / Albergues</option>
+                    </select>
+                </div>
+
+                <div class="filter-group" style="flex-grow: 2; min-width: 200px;">
+                    <span class="filter-label">Ubicación específica:</span>
+                    <input type="text" id="filter-ubicacion" class="filter-input-text" placeholder="Municipio, sector, ciudad...">
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Administración (Solo Visible para Administradores Logueados) -->
+        <div id="admin-panel" class="admin-panel" style="display: none; margin-bottom: 2.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Panel de Control Administrativo</h3>
+                <button class="btn btn-secondary" id="btn-admin-logout" style="padding: 0.35rem 0.75rem; font-size: 0.85rem;">Cerrar Sesión</button>
+            </div>
+            <div class="admin-panel-grid">
+                <div class="admin-card-action">
+                    <h4>Carga Masiva de Personas (Excel / CSV)</h4>
+                    <p>Guarda tu listado de Excel en formato <strong>CSV (delimitado por comas, codificación UTF-8)</strong>. Las columnas requeridas son: <code>nombre</code> y <code>cedula</code>. Columnas opcionales: <code>edad</code>, <code>ultima_ubicacion</code>, <code>observaciones</code>.</p>
+                    
+                    <div class="csv-upload-wrapper">
+                        <input type="file" id="csv-file" accept=".csv" class="form-control">
+                        <button class="btn btn-secondary" id="btn-import-csv">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem;">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            Importar CSV
+                        </button>
+                    </div>
+                    <div id="import-progress" class="import-progress" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Results / Cards Grid -->
+        <div class="cards-grid" id="cards-grid">
+            <!-- El estado inicial es limpio. Se rellenará al buscar o al ver la lista completa. -->
+        </div>
+
+        <!-- Botón para Cargar Más (Paginación) -->
+        <div class="load-more-container" id="load-more-container" style="display: none; text-align: center; margin-top: 2rem; margin-bottom: 2rem;">
+            <button class="btn btn-secondary" id="btn-load-more" style="padding: 0.8rem 2rem; font-size: 0.95rem; border-radius: 12px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem;">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+                Cargar más personas...
+            </button>
+        </div>
+
+        <!-- Toggle Full List Button (Shown at the bottom when not viewing list) -->
+        <div class="toggle-list-container" id="toggle-list-container">
+            <button class="btn btn-secondary" id="btn-toggle-list">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem;">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+                Ver Lista de Desaparecidos y Localizados
+            </button>
+        </div>
+    </main>
+
+    <!-- Modal: Reportar Desaparecido -->
+    <div class="modal-overlay" id="modal-report">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Reportar Persona Desaparecida</h3>
+                <button class="modal-close" id="btn-close-report">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-report-person">
+                    <div class="form-group">
+                        <label for="report-nombre">Nombre Completo *</label>
+                        <input type="text" id="report-nombre" class="form-control" placeholder="Ej: Juan Antonio Pérez" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="report-cedula">Cédula de Identidad *</label>
+                        <div class="cedula-input-group">
+                            <select id="report-cedula-prefix" class="cedula-prefix-select">
+                                <option value="V">V-</option>
+                                <option value="E">E-</option>
+                            </select>
+                            <input type="text" id="report-cedula" class="form-control cedula-number-input" placeholder="12.345.678" required inputmode="numeric" maxlength="12">
+                        </div>
+                    </div>
+                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label for="report-edad">Edad (Años)</label>
+                            <input type="number" id="report-edad" class="form-control" min="0" max="120" placeholder="Ej: 35">
+                        </div>
+                        <div class="form-group">
+                            <label for="report-telefono">Tu Teléfono de Contacto</label>
+                            <input type="tel" id="report-telefono" class="form-control" placeholder="Ej: 0412-1234567">
+                        </div>
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; margin-bottom: 1rem;">
+                        <input type="checkbox" id="report-es-menor" style="width: 1.15rem; height: 1.15rem; cursor: pointer; accent-color: var(--accent);">
+                        <label for="report-es-menor" style="margin-bottom: 0; cursor: pointer; font-weight: 500; font-size: 0.88rem; user-select: none; color: var(--text-primary);">Es menor de edad (Niño, niña o adolescente)</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="report-ubicacion">Última Ubicación Conocida</label>
+                        <input type="text" id="report-ubicacion" class="form-control" placeholder="Ej: Centro de Chacao, cerca de la plaza">
+                    </div>
+                    <div class="form-group">
+                        <label for="report-observaciones">Observaciones / Señas Particulares</label>
+                        <textarea id="report-observaciones" class="form-control" placeholder="Vestimenta, señas físicas, padecimientos médicos, etc."></textarea>
+                    </div>
+                    <div class="form-footer">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-report">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="btn-submit-report">Registrar Reporte</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Actualizar Estatus (Solo Admin) -->
+    <div class="modal-overlay" id="modal-status">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Actualizar Estatus de Localización</h3>
+                <button class="modal-close" id="btn-close-status">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-update-status">
+                    <input type="hidden" id="status-persona-id">
+                    <div class="form-group">
+                        <label for="status-nombre">Persona</label>
+                        <input type="text" id="status-nombre" class="form-control" readonly style="background: rgba(255,255,255,0.02); border-color: transparent;">
+                    </div>
+                    <div class="form-group">
+                        <label for="status-select">Estatus de la Persona *</label>
+                        <select id="status-select" class="form-control" required style="background-color: var(--bg-tertiary);">
+                            <option value="Desaparecido">Desaparecido / En búsqueda</option>
+                            <option value="Encontrado">Encontrado / Localizado</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="group-ubicacion-encontrado">
+                        <label for="status-ubicacion">¿Dónde fue encontrada? *</label>
+                        <input type="text" id="status-ubicacion" class="form-control" placeholder="Ej: Refugio Polideportivo de Baruta / En casa de familiares en Valencia">
+                        
+                        <label for="status-encontrado-por" style="margin-top: 1rem; display: block;">Encontrado por *</label>
+                        <input type="text" id="status-encontrado-por" class="form-control" placeholder="Nombre de quien lo reporta encontrado (ej: Pedro Pérez)">
+                        
+                        <label for="status-encontrado-por-cedula" style="margin-top: 1rem; display: block;">Cédula de quien lo encontró *</label>
+                        <div class="cedula-input-group">
+                            <select id="status-cedula-prefix" class="cedula-prefix-select">
+                                <option value="V">V-</option>
+                                <option value="E">E-</option>
+                            </select>
+                            <input type="text" id="status-encontrado-por-cedula" class="form-control cedula-number-input" placeholder="9.876.543" inputmode="numeric" maxlength="12">
+                        </div>
+                    </div>
+                    <div class="form-footer">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-status">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Estatus</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Login de Administrador -->
+    <div class="modal-overlay" id="modal-login">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Acceso de Administración (Supabase Auth)</h3>
+                <button class="modal-close" id="btn-close-login">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-admin-login">
+                    <div class="form-group">
+                        <label for="login-email">Correo Electrónico</label>
+                        <input type="email" id="login-email" class="form-control" required placeholder="admin@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Contraseña</label>
+                        <input type="password" id="login-password" class="form-control" required placeholder="Ingresa tu contraseña">
+                    </div>
+                    <div class="form-footer">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-login">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalles de Persona -->
+    <div class="modal-overlay" id="modal-details">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Detalles de la Persona</h3>
+                <button class="modal-close" id="btn-close-details">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; height: 100%; max-height: 70vh;">
+                <div id="details-content" style="flex: 1; overflow-y: auto; padding-right: 0.5rem; margin-bottom: 1rem;">
+                    <!-- Contenido inyectado dinámicamente -->
+                </div>
+                <div class="share-section" style="padding-top: 1rem; border-top: 1px solid var(--border-color); flex-shrink: 0;">
+                    <h4 style="margin-bottom: 0.75rem; text-align: center; color: var(--text-color);">Compartir y Ayudar a Difundir</h4>
+                    <div class="share-buttons" style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                        <button class="btn btn-share" id="btn-share-instagram" style="background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%); color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                            IG Stories
+                        </button>
+                        <button class="btn btn-share" id="btn-share-facebook" style="background: #1877F2; color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+                            Facebook
+                        </button>
+                        <button class="btn btn-share" id="btn-share-x" style="background: #000000; color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l11.733 16h4.267l-11.733-16z"></path><path d="M4 20l6.768-6.768m2.46-2.46L20 4"></path></svg>
+                            X
+                        </button>
+                        <button class="btn btn-share" id="btn-share-tiktok" style="background: #25F4EE; color: black; border: none; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
+                            TikTok
+                        </button>
+                    </div>
+                    <div style="margin-top: 1.25rem; text-align: center;">
+                        <a id="btn-report-error" href="#" target="_blank" style="color: var(--text-muted); font-size: 0.85rem; text-decoration: underline; transition: color var(--transition-fast);" onmouseover="this.style.color='var(--status-missing)'" onmouseout="this.style.color='var(--text-muted)'">¿La información es incorrecta? Reportar aquí</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 AQUIESTOYVENEZUELA.COM. Plataforma ciudadana para la localización y búsqueda de personas.</p>
+    </footer>
+
+    <!-- Scripts de Supabase, PapaParse y Lógica Local -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="static/js/config.js?v=6"></script>
+    <script src="static/js/app.js?v=11"></script>
+</body>
+</html>
