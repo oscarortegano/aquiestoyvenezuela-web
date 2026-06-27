@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
 serve(async (req) => {
@@ -44,19 +44,15 @@ serve(async (req) => {
   try {
     // 1. GET /stats
     if (path === "/stats" && method === "GET") {
-      const { count: total, error: e1 } = await supabase
-        .from("personas")
-        .select("*", { count: "exact", head: true });
-
-      const { count: desaparecidos, error: e2 } = await supabase
-        .from("personas")
-        .select("*", { count: "exact", head: true })
-        .eq("estado", "Desaparecido");
-
-      const { count: encontrados, error: e3 } = await supabase
-        .from("personas")
-        .select("*", { count: "exact", head: true })
-        .eq("estado", "Encontrado");
+      const [
+        { count: total, error: e1 },
+        { count: desaparecidos, error: e2 },
+        { count: encontrados, error: e3 },
+      ] = await Promise.all([
+        supabase.from("personas").select("id", { count: "exact", head: true }),
+        supabase.from("personas").select("id", { count: "exact", head: true }).eq("estado", "Desaparecido"),
+        supabase.from("personas").select("id", { count: "exact", head: true }).eq("estado", "Encontrado"),
+      ]);
 
       if (e1 || e2 || e3) {
         throw e1 || e2 || e3;
@@ -78,7 +74,7 @@ serve(async (req) => {
       const tipoUbicacionFilter = url.searchParams.get("tipoUbicacion") || "all";
       const ubicacionFilter = url.searchParams.get("ubicacion")?.trim() || "";
       const offset = parseInt(url.searchParams.get("offset") || "0", 10);
-      const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 50);
 
       let query = supabase.from("personas").select("*");
 
@@ -119,7 +115,8 @@ serve(async (req) => {
       }
 
       if (ubicacionFilter) {
-        const uq = `%${ubicacionFilter}%`;
+        const safeUbicacion = ubicacionFilter.replace(/[%_\\]/g, "\\$&");
+        const uq = `%${safeUbicacion}%`;
         query = query.or(`ultima_ubicacion.ilike.${uq},ubicacion_encontrado.ilike.${uq}`);
       }
 
