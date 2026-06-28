@@ -267,7 +267,7 @@ header p {
 }
 
 .filter-select {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--bg-tertiary);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     color: var(--text-primary);
@@ -281,11 +281,11 @@ header p {
 
 .filter-select:focus {
     border-color: var(--accent);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-secondary);
 }
 
 .filter-select option {
-    background-color: #0f172a;
+    background-color: var(--bg-tertiary);
     color: var(--text-primary);
 }
 

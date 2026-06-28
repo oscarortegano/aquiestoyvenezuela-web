@@ -1,25 +1,25 @@
-﻿// Estado global de la aplicaciÃ³n
+// Estado global de la aplicación
 const state = {
     isAdmin: false,
     useSandbox: false,       // Indica si estamos usando localStorage de prueba o Supabase
     whatsappPhone: '584242089153',
-    personas: [],            // Personas que estÃ¡n actualmente mostrÃ¡ndose en el grid
+    personas: [],            // Personas que están actualmente mostrándose en el grid
     showingFullList: false, // Controla si se visualiza el listado completo
-    searchCategory: 'all',  // Filtro de bÃºsqueda: 'all', 'cedula', 'nombre', 'apellido'
+    searchCategory: 'all',  // Filtro de búsqueda: 'all', 'cedula', 'nombre', 'apellido'
     statusFilter: 'all',     // Filtro de estado: 'all', 'Desaparecido', 'Encontrado'
     edadFilter: 'all',       // Filtro de edad: 'all', 'child', 'teen', 'adult', 'senior'
     ordenFilter: 'recientes', // Orden: 'recientes', 'nombre_asc', 'edad_asc', 'edad_desc'
     tipoUbicacionFilter: 'all', // Tipo: 'all', 'hospital', 'refugio'
-    ubicacionFilter: '',     // Filtro de ubicaciÃ³n: texto libre
+    ubicacionFilter: '',     // Filtro de ubicación: texto libre
     
-    // Estado de PaginaciÃ³n
+    // Estado de Paginación
     pageSize: 50,           // Cantidad de registros por lote
     offset: 0,              // Desplazamiento actual para la consulta
-    hasMore: false,         // Indica si hay mÃ¡s registros en el servidor
+    hasMore: false,         // Indica si hay más registros en el servidor
     isLoading: false        // Bloqueo para evitar consultas dobles
 };
 
-// Cargar nÃºmero de WhatsApp alternativo si se define en config.js
+// Cargar número de WhatsApp alternativo si se define en config.js
 if (typeof WHATSAPP_PHONE !== 'undefined') {
     state.whatsappPhone = WHATSAPP_PHONE;
 }
@@ -93,9 +93,9 @@ const DOM = {
     toastContainer: document.getElementById('toast-container')
 };
 
-// --- UTILIDADES DE FORMATO DE CÃ‰DULA ---
+// --- UTILIDADES DE FORMATO DE CÉDULA ---
 function formatCedulaNumber(value) {
-    // Eliminar todo lo que no sea dÃ­gito
+    // Eliminar todo lo que no sea dígito
     const digits = value.replace(/\D/g, '');
     // Formatear con puntos: 12.345.678
     if (digits.length <= 3) return digits;
@@ -119,7 +119,7 @@ function attachCedulaFormatter(inputId) {
         const oldLen = e.target.value.length;
         e.target.value = formatCedulaNumber(e.target.value);
         const newLen = e.target.value.length;
-        // Ajustar cursor despuÃ©s del formateo
+        // Ajustar cursor después del formateo
         const newPos = cursorPos + (newLen - oldLen);
         e.target.setSelectionRange(newPos, newPos);
     });
@@ -128,9 +128,9 @@ function attachCedulaFormatter(inputId) {
 // Cliente de Supabase (inicializado condicionalmente)
 let supabaseClient = null;
 
-// --- INICIALIZACIÃ“N ---
+// --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Determinar si usamos base de datos de producciÃ³n (Supabase) o simulaciÃ³n (Sandbox)
+    // 1. Determinar si usamos base de datos de producción (Supabase) o simulación (Sandbox)
     const isConfigured = typeof window.supabase !== 'undefined' && 
                          typeof SUPABASE_URL !== 'undefined' && 
                          !SUPABASE_URL.includes('TU_PROYECTO') && 
@@ -139,17 +139,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (isConfigured) {
         try {
-            // Inicializar Supabase en producciÃ³n
+            // Inicializar Supabase en producción
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             
-            // Escuchar cambios de sesiÃ³n
+            // Escuchar cambios de sesión
             supabaseClient.auth.onAuthStateChange((event, session) => {
                 setAdminState(!!session);
-                // Si el administrador cambia de sesiÃ³n, recargamos la vista actual
+                // Si el administrador cambia de sesión, recargamos la vista actual
                 triggerSearchOrListReset();
             });
             
-            // Verificar sesiÃ³n inicial
+            // Verificar sesión inicial
             const { data: { session } } = await supabaseClient.auth.getSession();
             setAdminState(!!session);
             state.useSandbox = false;
@@ -158,11 +158,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             setupSandboxMode();
         }
     } else {
-        // Inicializar en modo simulaciÃ³n local (Sandbox)
+        // Inicializar en modo simulación local (Sandbox)
         setupSandboxMode();
     }
     
-    // 2. Cargar EstadÃ­sticas iniciales del Dashboard
+    // 2. Cargar Estadísticas iniciales del Dashboard
     await loadStats();
     
     // 3. Registrar Listeners de Eventos
@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupSandboxMode() {
     state.useSandbox = true;
     
-    // Mostrar banner flotante de demostraciÃ³n local
+    // Mostrar banner flotante de demostración local
     const banner = document.createElement('div');
     banner.style.cssText = `
         position: fixed;
@@ -190,13 +190,13 @@ function setupSandboxMode() {
         box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     `;
     banner.innerHTML = `
-        ðŸš€ Modo DemostraciÃ³n Local (Sandbox). Los datos se guardan en este navegador. 
-        Para producciÃ³n, conecta tu base de datos de Supabase en <code style="background:rgba(0,0,0,0.2); padding:2px 6px; border-radius:4px;">static/js/config.js</code>.
+        🚀 Modo Demostración Local (Sandbox). Los datos se guardan en este navegador. 
+        Para producción, conecta tu base de datos de Supabase en <code style="background:rgba(0,0,0,0.2); padding:2px 6px; border-radius:4px;">static/js/config.js</code>.
     `;
     document.body.prepend(banner);
     document.body.style.paddingTop = '2.5rem';
     
-    // Cargar credenciales simulaciÃ³n
+    // Cargar credenciales simulación
     const sessionActive = sessionStorage.getItem('admin_session_demo') === 'active';
     setAdminState(sessionActive);
     
@@ -213,7 +213,7 @@ function setupSandboxMode() {
     }
 }
 
-// --- CONSULTA DE ESTADÃSTICAS ---
+// --- CONSULTA DE ESTADÍSTICAS ---
 
 async function loadStats() {
     if (state.useSandbox) {
@@ -258,7 +258,7 @@ async function fetchRecords(append = false) {
     if (state.isLoading) return;
     state.isLoading = true;
     
-    // Actualizar UI del botÃ³n de carga
+    // Actualizar UI del botón de carga
     DOM.btnLoadMore.disabled = true;
     DOM.btnLoadMore.innerHTML = `
         <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem; animation: rotate 1s linear infinite;">
@@ -291,11 +291,11 @@ async function fetchRecords(append = false) {
     try {
         if (state.useSandbox) {
             // ==========================================
-            // LÃ“GICA LOCAL (SANDBOX - localStorage)
+            // LÓGICA LOCAL (SANDBOX - localStorage)
             // ==========================================
             let localData = JSON.parse(localStorage.getItem('personas_demo') || '[]');
             
-            // A. Aplicar BÃºsqueda y CategorÃ­as localmente
+            // A. Aplicar Búsqueda y Categorías localmente
             if (searchQuery) {
                 if (state.searchCategory === 'cedula') {
                     localData = localData.filter(p => p.cedula.toLowerCase().includes(searchQuery));
@@ -336,7 +336,7 @@ async function fetchRecords(append = false) {
                 });
             }
 
-            // D. Aplicar filtro de ubicaciÃ³n localmente
+            // D. Aplicar filtro de ubicación localmente
             if (state.ubicacionFilter) {
                 const uq = state.ubicacionFilter.toLowerCase();
                 localData = localData.filter(p => {
@@ -346,7 +346,7 @@ async function fetchRecords(append = false) {
                 });
             }
 
-            // Filtrar por tipo de ubicaciÃ³n en memoria local
+            // Filtrar por tipo de ubicación en memoria local
             if (state.tipoUbicacionFilter !== 'all') {
                 localData = localData.filter(p => {
                     const u1 = (p.ultima_ubicacion || '').toLowerCase();
@@ -494,13 +494,13 @@ async function fetchRecords(append = false) {
         showToast('Error al consultar el directorio.', 'error');
     } finally {
         state.isLoading = false;
-        // Restaurar estado del botÃ³n de carga
+        // Restaurar estado del botón de carga
         DOM.btnLoadMore.disabled = false;
         DOM.btnLoadMore.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem;">
                 <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
-            Cargar mÃ¡s personas...
+            Cargar más personas...
         `;
     }
 }
@@ -510,14 +510,14 @@ async function fetchRecords(append = false) {
 function renderPersonas(append = false) {
     const searchQuery = DOM.searchInput.value.trim();
 
-    // 1. Mostrar/Ocultar controles de paginaciÃ³n e informaciÃ³n
+    // 1. Mostrar/Ocultar controles de paginación e información
     if (state.hasMore) {
         DOM.loadMoreContainer.style.display = 'block';
     } else {
         DOM.loadMoreContainer.style.display = 'none';
     }
 
-    // Si no cargamos por "Cargar mÃ¡s", limpiamos la grilla
+    // Si no cargamos por "Cargar más", limpiamos la grilla
     if (!append) {
         DOM.cardsGrid.innerHTML = '';
     }
@@ -540,7 +540,7 @@ function renderPersonas(append = false) {
     }
 
     // 3. Renderizar las tarjetas de personas en el grid
-    // Si estamos haciendo append, solo renderizamos los nuevos (los Ãºltimos N)
+    // Si estamos haciendo append, solo renderizamos los nuevos (los últimos N)
     const listToRender = append ? state.personas.slice(state.personas.length - state.pageSize) : state.personas;
     renderCards(listToRender);
 }
@@ -581,13 +581,13 @@ function renderCards(list) {
                         <h3 class="person-name" title="${escapeHTML(person.nombre)}">${escapeHTML(person.nombre)}</h3>
                         <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.25rem;">
                             <span class="status-badge ${badgeClass}">${badgeText}</span>
-                            ${person.es_menor ? '<span class="status-badge minor">ðŸ§’ Menor de Edad</span>' : ''}
+                            ${person.es_menor ? '<span class="status-badge minor">🧒 Menor de Edad</span>' : ''}
                         </div>
                     </div>
                 </div>
                 <div class="card-body">
                     <div class="info-row">
-                        <span class="info-label">CÃ©dula:</span>
+                        <span class="info-label">Cédula:</span>
                         <span class="info-value">${escapeHTML(person.cedula)}</span>
                     </div>
         `;
@@ -596,7 +596,7 @@ function renderCards(list) {
             cardHTML += `
                 <div class="info-row">
                     <span class="info-label">Edad:</span>
-                    <span class="info-value">${person.edad} aÃ±os</span>
+                    <span class="info-value">${person.edad} años</span>
                 </div>
             `;
         }
@@ -604,7 +604,7 @@ function renderCards(list) {
         if (person.ultima_ubicacion) {
             cardHTML += `
                 <div class="info-row">
-                    <span class="info-label">Ãšltima Ubic.:</span>
+                    <span class="info-label">Última Ubic.:</span>
                     <span class="info-value">${escapeHTML(person.ultima_ubicacion)}</span>
                 </div>
             `;
@@ -664,22 +664,22 @@ function renderEmptySearchState(queryTerm) {
     const container = document.createElement('div');
     container.className = 'registration-bubble';
     
-    // Auto-detectar si el tÃ©rmino de bÃºsqueda parece una cÃ©dula o un nombre
+    // Auto-detectar si el término de búsqueda parece una cédula o un nombre
     const isNumeric = /^[0-9.-]+$/.test(queryTerm.replace(/^[VEve]-?/, ''));
     const prefillCedula = isNumeric ? queryTerm.toUpperCase() : '';
     const prefillNombre = isNumeric ? '' : queryTerm;
     
     container.innerHTML = `
         <h4>Persona no encontrada en el registro</h4>
-        <p>No tenemos reportes sobre esta persona. Si estÃ¡ desaparecida, puedes ingresarla directamente aquÃ­ en este formulario para registrarla y comenzar su bÃºsqueda:</p>
+        <p>No tenemos reportes sobre esta persona. Si está desaparecida, puedes ingresarla directamente aquí en este formulario para registrarla y comenzar su búsqueda:</p>
         
         <form id="inline-report-form">
             <div class="form-group">
                 <label for="inline-nombre">Nombre Completo *</label>
-                <input type="text" id="inline-nombre" class="form-control" placeholder="Ej: Juan Antonio PÃ©rez" value="${escapeHTML(prefillNombre)}" required>
+                <input type="text" id="inline-nombre" class="form-control" placeholder="Ej: Juan Antonio Pérez" value="${escapeHTML(prefillNombre)}" required>
             </div>
             <div class="form-group">
-                <label for="inline-cedula">CÃ©dula de Identidad *</label>
+                <label for="inline-cedula">Cédula de Identidad *</label>
                 <div class="cedula-input-group">
                     <select id="inline-cedula-prefix" class="cedula-prefix-select">
                         <option value="V">V-</option>
@@ -690,25 +690,25 @@ function renderEmptySearchState(queryTerm) {
             </div>
             <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
-                    <label for="inline-edad">Edad (AÃ±os)</label>
+                    <label for="inline-edad">Edad (Años)</label>
                     <input type="number" id="inline-edad" class="form-control" min="0" max="120" placeholder="Ej: 35">
                 </div>
                 <div class="form-group">
-                    <label for="inline-telefono">Tu TelÃ©fono de Contacto</label>
+                    <label for="inline-telefono">Tu Teléfono de Contacto</label>
                     <input type="tel" id="inline-telefono" class="form-control" placeholder="Ej: 0412-1234567">
                 </div>
             </div>
             <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; margin-bottom: 1rem;">
                 <input type="checkbox" id="inline-es-menor" style="width: 1.15rem; height: 1.15rem; cursor: pointer; accent-color: var(--accent);">
-                <label for="inline-es-menor" style="margin-bottom: 0; cursor: pointer; font-weight: 500; font-size: 0.88rem; user-select: none; color: var(--text-primary);">Es menor de edad (NiÃ±o, niÃ±a o adolescente)</label>
+                <label for="inline-es-menor" style="margin-bottom: 0; cursor: pointer; font-weight: 500; font-size: 0.88rem; user-select: none; color: var(--text-primary);">Es menor de edad (Niño, niña o adolescente)</label>
             </div>
             <div class="form-group">
-                <label for="inline-ubicacion">Ãšltima UbicaciÃ³n Conocida</label>
+                <label for="inline-ubicacion">Última Ubicación Conocida</label>
                 <input type="text" id="inline-ubicacion" class="form-control" placeholder="Ej: Centro de Chacao, cerca de la plaza">
             </div>
             <div class="form-group">
-                <label for="inline-observaciones">Observaciones / SeÃ±as Particulares</label>
-                <textarea id="inline-observaciones" class="form-control" placeholder="Vestimenta, seÃ±as fÃ­sicas, padecimientos mÃ©dicos, etc."></textarea>
+                <label for="inline-observaciones">Observaciones / Señas Particulares</label>
+                <textarea id="inline-observaciones" class="form-control" placeholder="Vestimenta, señas físicas, padecimientos médicos, etc."></textarea>
             </div>
             <div class="form-footer">
                 <button type="button" class="btn btn-secondary" id="btn-cancel-inline">Cancelar</button>
@@ -719,14 +719,14 @@ function renderEmptySearchState(queryTerm) {
     
     DOM.cardsGrid.appendChild(container);
     
-    // Vincular envÃ­o de formulario
+    // Vincular envío de formulario
     const inlineForm = container.querySelector('#inline-report-form');
     inlineForm.addEventListener('submit', handleInlineReportSubmit);
     
-    // Auto-formato de cÃ©dula inline
+    // Auto-formato de cédula inline
     attachCedulaFormatter('inline-cedula');
     
-    // BotÃ³n cancelar limpia la bÃºsqueda y restaura la pantalla
+    // Botón cancelar limpia la búsqueda y restaura la pantalla
     container.querySelector('#btn-cancel-inline').addEventListener('click', () => {
         DOM.searchInput.value = '';
         DOM.searchBtnContainer.style.display = 'none';
@@ -755,7 +755,7 @@ async function handleInlineReportSubmit(e) {
             const localData = JSON.parse(localStorage.getItem('personas_demo') || '[]');
             const duplicado = localData.some(p => p.cedula === cedula);
             if (duplicado) {
-                showToast(`La cÃ©dula ${cedula} ya estÃ¡ registrada en el sistema.`, 'error');
+                showToast(`La cédula ${cedula} ya está registrada en el sistema.`, 'error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Registrar Reporte';
                 return;
@@ -778,7 +778,7 @@ async function handleInlineReportSubmit(e) {
             localData.unshift(newPerson);
             localStorage.setItem('personas_demo', JSON.stringify(localData));
             
-            showToast('Reporte registrado con Ã©xito.', 'success');
+            showToast('Reporte registrado con éxito.', 'success');
             DOM.searchInput.value = '';
             DOM.searchBtnContainer.style.display = 'none';
             
@@ -786,7 +786,7 @@ async function handleInlineReportSubmit(e) {
             triggerSearchOrListReset();
             
         } else {
-            // Validar duplicado en producciÃ³n
+            // Validar duplicado en producción
             const { data: existing, error: checkError } = await supabaseClient
                 .from('personas')
                 .select('id, estado')
@@ -796,7 +796,7 @@ async function handleInlineReportSubmit(e) {
             if (checkError) throw checkError;
             
             if (existing) {
-                showToast(`La cÃ©dula ${cedula} ya estÃ¡ registrada como: ${existing.estado}.`, 'error');
+                showToast(`La cédula ${cedula} ya está registrada como: ${existing.estado}.`, 'error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Registrar Reporte';
                 return;
@@ -816,7 +816,7 @@ async function handleInlineReportSubmit(e) {
             const { error: insertError } = await supabaseClient.from('personas').insert([insertData]);
             if (insertError) throw insertError;
             
-            showToast('Reporte registrado con Ã©xito.', 'success');
+            showToast('Reporte registrado con éxito.', 'success');
             DOM.searchInput.value = '';
             DOM.searchBtnContainer.style.display = 'none';
             
@@ -831,14 +831,14 @@ async function handleInlineReportSubmit(e) {
     }
 }
 
-// --- GESTIÃ“N DE EVENTOS (LISTENERS) ---
+// --- GESTIÓN DE EVENTOS (LISTENERS) ---
 
 function setupEventListeners() {
-    // Auto-formato de cÃ©dula con puntos
+    // Auto-formato de cédula con puntos
     attachCedulaFormatter('report-cedula');
     attachCedulaFormatter('status-encontrado-por-cedula');
     
-    // Controlar visibilidad del botÃ³n Buscar Persona
+    // Controlar visibilidad del botón Buscar Persona
     DOM.searchInput.addEventListener('input', () => {
         const query = DOM.searchInput.value.trim();
         if (query.length > 0) {
@@ -849,13 +849,13 @@ function setupEventListeners() {
         }
     });
 
-    // Ejecutar bÃºsqueda al pulsar el botÃ³n Buscar
+    // Ejecutar búsqueda al pulsar el botón Buscar
     DOM.btnRunSearch.addEventListener('click', () => {
-        state.showingFullList = false; // La bÃºsqueda apaga el modo directorio completo
+        state.showingFullList = false; // La búsqueda apaga el modo directorio completo
         fetchRecords(false);
     });
 
-    // Ejecutar bÃºsqueda al pulsar Enter
+    // Ejecutar búsqueda al pulsar Enter
     DOM.searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             state.showingFullList = false;
@@ -863,7 +863,7 @@ function setupEventListeners() {
         }
     });
 
-    // Filtros de categorÃ­a (Chips)
+    // Filtros de categoría (Chips)
     document.querySelectorAll('#category-filters .filter-chip').forEach(chip => {
         chip.addEventListener('click', () => {
             document.querySelectorAll('#category-filters .filter-chip').forEach(c => c.classList.remove('active'));
@@ -914,7 +914,7 @@ function setupEventListeners() {
         });
     }
 
-    // Filtro de tipo de ubicaciÃ³n (select)
+    // Filtro de tipo de ubicación (select)
     if (DOM.filterTipoUbicacion) {
         DOM.filterTipoUbicacion.addEventListener('change', () => {
             state.tipoUbicacionFilter = DOM.filterTipoUbicacion.value;
@@ -922,13 +922,13 @@ function setupEventListeners() {
         });
     }
 
-    // Filtro de ubicaciÃ³n (input de texto)
+    // Filtro de ubicación (input de texto)
     DOM.filterUbicacion.addEventListener('input', () => {
         state.ubicacionFilter = DOM.filterUbicacion.value.trim();
         fetchRecords(false);
     });
 
-    // Alternar visualizaciÃ³n del listado completo
+    // Alternar visualización del listado completo
     DOM.btnToggleList.addEventListener('click', () => {
         state.showingFullList = !state.showingFullList;
         if (state.showingFullList) {
@@ -940,9 +940,9 @@ function setupEventListeners() {
         }
     });
 
-    // BotÃ³n de PaginaciÃ³n "Cargar mÃ¡s"
+    // Botón de Paginación "Cargar más"
     DOM.btnLoadMore.addEventListener('click', () => {
-        fetchRecords(true); // Cargar siguiente bloque aÃ±adiÃ©ndolo a la lista
+        fetchRecords(true); // Cargar siguiente bloque añadiéndolo a la lista
     });
     
     // Modales
@@ -1024,7 +1024,7 @@ function triggerSearchOrListReset() {
     }
 }
 
-// --- PROCESAMIENTO DE OPERACIONES (MÃ‰TODO DUAL: SANDBOX O SUPABASE) ---
+// --- PROCESAMIENTO DE OPERACIONES (MÉTODO DUAL: SANDBOX O SUPABASE) ---
 
 async function handleReportSubmit(e) {
     e.preventDefault();
@@ -1042,11 +1042,11 @@ async function handleReportSubmit(e) {
     
     try {
         if (state.useSandbox) {
-            // --- CÃ“DIGO SANDBOX ---
+            // --- CÓDIGO SANDBOX ---
             const localData = JSON.parse(localStorage.getItem('personas_demo') || '[]');
             const duplicado = localData.some(p => p.cedula === cedula);
             if (duplicado) {
-                showToast(`La cÃ©dula ${cedula} ya estÃ¡ registrada en el sistema.`, 'error');
+                showToast(`La cédula ${cedula} ya está registrada en el sistema.`, 'error');
                 DOM.btnSubmitReport.disabled = false;
                 DOM.btnSubmitReport.textContent = 'Registrar Reporte';
                 return;
@@ -1069,17 +1069,17 @@ async function handleReportSubmit(e) {
             localData.unshift(newPerson);
             localStorage.setItem('personas_demo', JSON.stringify(localData));
             
-            showToast('Reporte registrado con Ã©xito.', 'success');
+            showToast('Reporte registrado con éxito.', 'success');
             DOM.formReportPerson.reset();
             toggleModal(DOM.modalReport, false);
             
-            // Recargar estadÃ­sticas y refrescar vista
+            // Recargar estadísticas y refrescar vista
             loadStats();
             fetchRecords(false);
             
         } else {
             try {
-                // Validar cÃ©dula duplicada llamando al API
+                // Validar cédula duplicada llamando al API
                 const checkRes = await fetch(`${SUPABASE_URL}/functions/v1/api/personas?q=${encodeURIComponent(cedula)}&category=cedula`, {
                     headers: {
                         'apikey': SUPABASE_ANON_KEY,
@@ -1089,7 +1089,7 @@ async function handleReportSubmit(e) {
                 if (!checkRes.ok) throw new Error('API no disponible');
                 const existing = await checkRes.json();
                 if (existing && existing.length > 0) {
-                    showToast(`La cÃ©dula ${cedula} ya estÃ¡ registrada como: ${existing[0].estado}.`, 'error');
+                    showToast(`La cédula ${cedula} ya está registrada como: ${existing[0].estado}.`, 'error');
                     DOM.btnSubmitReport.disabled = false;
                     DOM.btnSubmitReport.textContent = 'Registrar Reporte';
                     return;
@@ -1127,7 +1127,7 @@ async function handleReportSubmit(e) {
                 if (checkError) throw checkError;
 
                 if (existing) {
-                    showToast(`La cÃ©dula ${cedula} ya estÃ¡ registrada como: ${existing.estado}.`, 'error');
+                    showToast(`La cédula ${cedula} ya está registrada como: ${existing.estado}.`, 'error');
                     DOM.btnSubmitReport.disabled = false;
                     DOM.btnSubmitReport.textContent = 'Registrar Reporte';
                     return;
@@ -1145,7 +1145,7 @@ async function handleReportSubmit(e) {
                 if (insertError) throw insertError;
             }
             
-            showToast('Reporte registrado con Ã©xito.', 'success');
+            showToast('Reporte registrado con éxito.', 'success');
             DOM.formReportPerson.reset();
             toggleModal(DOM.modalReport, false);
             
@@ -1198,7 +1198,7 @@ async function handleLoginSubmit(e) {
                 }
             }
         } catch (err) {
-            console.error('Error al iniciar sesiÃ³n:', err);
+            console.error('Error al iniciar sesión:', err);
             showToast('Error al conectar con Supabase Auth.', 'error');
         }
     }
@@ -1208,7 +1208,7 @@ async function handleLogout() {
     if (state.useSandbox) {
         sessionStorage.removeItem('admin_session_demo');
         setAdminState(false);
-        showToast('SesiÃ³n administrativa de demostraciÃ³n cerrada.', 'success');
+        showToast('Sesión administrativa de demostración cerrada.', 'success');
         
         if (DOM.searchInput.value.trim() || state.showingFullList) {
             fetchRecords(false);
@@ -1218,7 +1218,7 @@ async function handleLogout() {
             const { error } = await supabaseClient.auth.signOut();
             if (!error) {
                 setAdminState(false);
-                showToast('SesiÃ³n administrativa cerrada.', 'success');
+                showToast('Sesión administrativa cerrada.', 'success');
                 await loadStats();
                 
                 if (DOM.searchInput.value.trim() || state.showingFullList) {
@@ -1226,7 +1226,7 @@ async function handleLogout() {
                 }
             }
         } catch (err) {
-            console.error('Error cerrando sesiÃ³n:', err);
+            console.error('Error cerrando sesión:', err);
         }
     }
 }
@@ -1262,7 +1262,7 @@ async function handleStatusSubmit(e) {
                 return p;
             });
             localStorage.setItem('personas_demo', JSON.stringify(updated));
-            showToast('Estado actualizado con Ã©xito.', 'success');
+            showToast('Estado actualizado con éxito.', 'success');
             toggleModal(DOM.modalStatus, false);
             
             await loadStats();
@@ -1291,7 +1291,7 @@ async function handleStatusSubmit(e) {
                 });
                 if (!res.ok) {
                     const errData = await res.json();
-                    throw new Error(errData.error || 'Error al actualizar estatus vÃ­a API');
+                    throw new Error(errData.error || 'Error al actualizar estatus vía API');
                 }
             } catch (apiErr) {
                 console.warn('API no disponible para actualizar estado, usando fallback directo:', apiErr);
@@ -1299,7 +1299,7 @@ async function handleStatusSubmit(e) {
                 if (error) throw error;
             }
             
-            showToast('Estado actualizado con Ã©xito.', 'success');
+            showToast('Estado actualizado con éxito.', 'success');
             toggleModal(DOM.modalStatus, false);
             
             await loadStats();
@@ -1312,7 +1312,7 @@ async function handleStatusSubmit(e) {
 }
 
 async function handleDeletePerson(id, nombre) {
-    if (!confirm(`Â¿EstÃ¡s seguro de que deseas eliminar permanentemente el reporte de ${nombre}?`)) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente el reporte de ${nombre}?`)) {
         return;
     }
     
@@ -1346,14 +1346,14 @@ async function handleDeletePerson(id, nombre) {
                 const { error } = await supabaseClient.from('personas').delete().eq('id', id);
                 if (error) throw error;
             }
-            showToast('Registro eliminado con Ã©xito.', 'success');
+            showToast('Registro eliminado con éxito.', 'success');
             
             await loadStats();
             await fetchRecords(false);
         }
     } catch (err) {
         console.error('Error al eliminar persona:', err);
-        showToast('No tienes permisos o fallÃ³ la conexiÃ³n.', 'error');
+        showToast('No tienes permisos o falló la conexión.', 'error');
     }
 }
 
@@ -1378,7 +1378,7 @@ function handleCsvImport() {
         complete: async function(results) {
             const rows = results.data;
             if (rows.length === 0) {
-                showToast('El archivo CSV estÃ¡ vacÃ­o.', 'error');
+                showToast('El archivo CSV está vacío.', 'error');
                 resetCsvButton();
                 return;
             }
@@ -1428,7 +1428,7 @@ function handleCsvImport() {
             }
             
             if (mappedRows.length === 0) {
-                showToast('No se encontraron columnas de "nombre" y "cedula" vÃ¡lidas.', 'error');
+                showToast('No se encontraron columnas de "nombre" y "cedula" válidas.', 'error');
                 resetCsvButton();
                 return;
             }
@@ -1455,8 +1455,8 @@ function handleCsvImport() {
                     });
                     
                     localStorage.setItem('personas_demo', JSON.stringify(localData));
-                    showToast(`Se importaron ${mappedRows.length} personas con Ã©xito localmente.`, 'success');
-                    DOM.importProgress.textContent = `Â¡ImportaciÃ³n exitosa! ${mappedRows.length} registros cargados.`;
+                    showToast(`Se importaron ${mappedRows.length} personas con éxito localmente.`, 'success');
+                    DOM.importProgress.textContent = `¡Importación exitosa! ${mappedRows.length} registros cargados.`;
                     DOM.importProgress.style.color = 'var(--status-found)';
                     DOM.csvFile.value = '';
                     
@@ -1478,18 +1478,18 @@ function handleCsvImport() {
                         });
                         if (!res.ok) {
                             const errData = await res.json();
-                            throw new Error(errData.error || 'Error en importaciÃ³n masiva via API');
+                            throw new Error(errData.error || 'Error en importación masiva via API');
                         }
                     } catch (apiErr) {
-                        console.warn('API no disponible para importaciÃ³n CSV, usando fallback directo:', apiErr);
+                        console.warn('API no disponible para importación CSV, usando fallback directo:', apiErr);
                         const { error } = await supabaseClient
                             .from('personas')
                             .upsert(mappedRows, { onConflict: 'cedula' });
                         if (error) throw error;
                     }
                     
-                    showToast(`Se importaron ${mappedRows.length} personas con Ã©xito.`, 'success');
-                    DOM.importProgress.textContent = `Â¡ImportaciÃ³n exitosa! ${mappedRows.length} registros cargados.`;
+                    showToast(`Se importaron ${mappedRows.length} personas con éxito.`, 'success');
+                    DOM.importProgress.textContent = `¡Importación exitosa! ${mappedRows.length} registros cargados.`;
                     DOM.importProgress.style.color = 'var(--status-found)';
                     DOM.csvFile.value = '';
                     
@@ -1520,7 +1520,7 @@ function resetCsvButton() {
     DOM.importProgress.style.display = 'none';
 }
 
-// --- UTILERÃAS / AUXILIARES ---
+// --- UTILERÍAS / AUXILIARES ---
 
 function setAdminState(loggedIn) {
     state.isAdmin = loggedIn;
@@ -1541,7 +1541,7 @@ function toggleModal(modalEl, show) {
     }
 }
 
-// RotaciÃ³n del spinner de carga
+// Rotación del spinner de carga
 const styleSheet = document.createElement("style");
 styleSheet.innerText = `
     @keyframes rotate {
@@ -1568,7 +1568,7 @@ function toggleUbicacionField(show) {
     }
 }
 
-// Abrir el modal de actualizaciÃ³n de estatus
+// Abrir el modal de actualización de estatus
 window.openStatusModal = function(id, nombre, estadoActual, ubicacionActual, encontradoPor, encontradoPorCedula) {
     DOM.statusPersonaId.value = id;
     DOM.statusNombre.value = nombre;
@@ -1617,7 +1617,7 @@ function escapeHTML(str) {
     );
 }
 
-// Escapar cadenas en llamadas dinÃ¡micas inline de onclick
+// Escapar cadenas en llamadas dinámicas inline de onclick
 function escapeJS(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/['"\\]/g, char => '\\' + char);
@@ -1639,28 +1639,28 @@ window.openDetailsModal = function(id) {
         <div style="text-align: center; margin-bottom: 1.5rem;">
             <h2 style="margin: 0 0 0.5rem 0; font-size: 2rem; color: var(--text-color);">${escapeHTML(person.nombre)}</h2>
             <span class="status-badge ${badgeClass}" style="font-size: 1rem; padding: 0.35rem 1rem;">${badgeText}</span>
-            ${person.es_menor ? '<span class="status-badge minor" style="font-size: 0.9rem; margin-left: 0.5rem;">ðŸ§’ Menor de Edad</span>' : ''}
+            ${person.es_menor ? '<span class="status-badge minor" style="font-size: 0.9rem; margin-left: 0.5rem;">🧒 Menor de Edad</span>' : ''}
         </div>
         
         <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
             <div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-                    <strong style="color: var(--text-color-muted)">CÃ©dula:</strong> 
+                    <strong style="color: var(--text-color-muted)">Cédula:</strong> 
                     <span style="font-weight: 500">${escapeHTML(person.cedula)}</span>
                 </div>
                 ${person.edad ? `
                 <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
                     <strong style="color: var(--text-color-muted)">Edad:</strong> 
-                    <span style="font-weight: 500">${person.edad} aÃ±os</span>
+                    <span style="font-weight: 500">${person.edad} años</span>
                 </div>` : ''}
                 ${person.telefono_contacto ? `
                 <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-                    <strong style="color: var(--text-color-muted)">TelÃ©fono Contacto:</strong> 
+                    <strong style="color: var(--text-color-muted)">Teléfono Contacto:</strong> 
                     <span style="font-weight: 500">${escapeHTML(person.telefono_contacto)}</span>
                 </div>` : ''}
                 ${person.ultima_ubicacion ? `
                 <div style="display: flex; flex-direction: column; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-                    <strong style="color: var(--text-color-muted); margin-bottom: 0.25rem;">Ãšltima UbicaciÃ³n Conocida:</strong> 
+                    <strong style="color: var(--text-color-muted); margin-bottom: 0.25rem;">Última Ubicación Conocida:</strong> 
                     <span style="font-weight: 500; line-height: 1.4;">${escapeHTML(person.ultima_ubicacion)}</span>
                 </div>` : ''}
                 <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
@@ -1672,7 +1672,7 @@ window.openDetailsModal = function(id) {
     if (person.estado === 'Encontrado') {
         html += `
                 <div style="display: flex; flex-direction: column; background: rgba(16, 185, 129, 0.1); padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; border: 1px solid rgba(16, 185, 129, 0.2);">
-                    <strong style="color: var(--status-found); margin-bottom: 0.25rem;">UbicaciÃ³n Actual (Localizado):</strong> 
+                    <strong style="color: var(--status-found); margin-bottom: 0.25rem;">Ubicación Actual (Localizado):</strong> 
                     <span style="font-weight: 600;">${escapeHTML(person.ubicacion_encontrado || 'No especificada')}</span>
                     ${person.encontrado_por ? `
                     <div style="margin-top: 0.5rem; font-size: 0.9rem;">
@@ -1699,12 +1699,12 @@ window.openDetailsModal = function(id) {
     `;
 
     if (isMissing) {
-        let msgText = `Hola, tengo informaciÃ³n sobre la persona reportada como Desaparecida:\n` +
+        let msgText = `Hola, tengo información sobre la persona reportada como Desaparecida:\n` +
                       `- Nombre: ${person.nombre}\n` +
-                      `- CÃ©dula: ${person.cedula}\n`;
-        if (person.edad) msgText += `- Edad: ${person.edad} aÃ±os\n`;
-        if (person.ultima_ubicacion) msgText += `- Ãšltima ubicaciÃ³n: ${person.ultima_ubicacion}\n`;
-        msgText += `\nInformaciÃ³n sobre su paradero / estado: `;
+                      `- Cédula: ${person.cedula}\n`;
+        if (person.edad) msgText += `- Edad: ${person.edad} años\n`;
+        if (person.ultima_ubicacion) msgText += `- Última ubicación: ${person.ultima_ubicacion}\n`;
+        msgText += `\nInformación sobre su paradero / estado: `;
         const encodedWA = encodeURIComponent(msgText);
         html += `
         <div style="margin-top: 1rem; text-align: center;">
@@ -1712,7 +1712,7 @@ window.openDetailsModal = function(id) {
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem;">
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
                 </svg>
-                Informar UbicaciÃ³n / Encontrado (WA)
+                Informar Ubicación / Encontrado (WA)
             </a>
         </div>
         `;
@@ -1725,13 +1725,13 @@ window.openDetailsModal = function(id) {
     // Configurar botones de compartir
     const shareUrl = window.location.href.split('?')[0]; // URL base
     let shareText = isMissing 
-        ? `AyÃºdame a encontrar a ${person.nombre}. Reportado(a) como desaparecido(a) en Venezuela.` 
-        : `Â¡Excelentes noticias! ${person.nombre} ha sido localizado(a) en Venezuela.`;
+        ? `Ayúdame a encontrar a ${person.nombre}. Reportado(a) como desaparecido(a) en Venezuela.` 
+        : `¡Excelentes noticias! ${person.nombre} ha sido localizado(a) en Venezuela.`;
     
     if (person.ultima_ubicacion && isMissing) {
-        shareText += ` Visto(a) por Ãºltima vez en: ${person.ultima_ubicacion}.`;
+        shareText += ` Visto(a) por última vez en: ${person.ultima_ubicacion}.`;
     }
-    shareText += ` MÃ¡s informaciÃ³n: ${shareUrl}`;
+    shareText += ` Más información: ${shareUrl}`;
     
     const encodedText = encodeURIComponent(shareText);
     const encodedUrl = encodeURIComponent(shareUrl);
@@ -1760,7 +1760,7 @@ window.openDetailsModal = function(id) {
     }
 
     if (DOM.btnReportError) {
-        const errorText = `Hola, quiero reportar un error en la informaciÃ³n sobre el perfil de: ${person.nombre} (C.I. ${person.cedula}). La informaciÃ³n correcta es: `;
+        const errorText = `Hola, quiero reportar un error en la información sobre el perfil de: ${person.nombre} (C.I. ${person.cedula}). La información correcta es: `;
         DOM.btnReportError.href = `https://wa.me/${state.whatsappPhone}?text=${encodeURIComponent(errorText)}`;
     }
 
