@@ -1,4 +1,4 @@
-# Aquí Estoy Venezuela Web
+# Aquí Estoy Venezuela Web.
 
 Plataforma web ciudadana para ayudar a registrar, buscar y actualizar información sobre personas desaparecidas o localizadas en Venezuela durante situaciones de emergencia.
 
