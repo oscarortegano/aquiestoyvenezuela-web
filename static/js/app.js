@@ -274,11 +274,10 @@ async function fetchRecords(append = false) {
         Cargando registros...
     `;
 
-    // Mostrar barra de filtros al cargar registros (siempre que se busque o muestre el directorio)
     DOM.filtersBar.style.display = 'flex';
 
-    // 1. Calcular offset
     if (!append) {
+        renderSkeletons();
         state.offset = 0;
     } else {
         state.offset += state.pageSize;
@@ -506,6 +505,33 @@ async function fetchRecords(append = false) {
 }
 
 // --- RENDERIZADO DE LA INTERFAZ ---
+
+function renderSkeletons() {
+    DOM.cardsGrid.innerHTML = '';
+    for (let i = 0; i < 6; i++) {
+        const card = document.createElement('div');
+        card.className = 'person-card skeleton';
+        card.innerHTML = `
+            <div>
+                <div class="card-header-wrapper">
+                    <div class="skeleton-line skeleton-avatar"></div>
+                    <div class="card-header-details">
+                        <div class="skeleton-line skeleton-title"></div>
+                        <div class="skeleton-line skeleton-badge"></div>
+                    </div>
+                </div>
+                <div class="card-body" style="margin-top:0.75rem;">
+                    <div class="skeleton-line skeleton-row"></div>
+                    <div class="skeleton-line skeleton-row" style="width:80%;"></div>
+                    <div class="skeleton-line skeleton-row" style="width:60%;"></div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="skeleton-line skeleton-row" style="width:40%; margin-left:auto;"></div>
+            </div>`;
+        DOM.cardsGrid.appendChild(card);
+    }
+}
 
 function renderPersonas(append = false) {
     const searchQuery = DOM.searchInput.value.trim();
@@ -1540,16 +1566,6 @@ function toggleModal(modalEl, show) {
         modalEl.classList.remove('active');
     }
 }
-
-// Rotación del spinner de carga
-const styleSheet = document.createElement("style");
-styleSheet.innerText = `
-    @keyframes rotate {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-`;
-document.head.appendChild(styleSheet);
 
 function toggleUbicacionField(show) {
     if (show) {
