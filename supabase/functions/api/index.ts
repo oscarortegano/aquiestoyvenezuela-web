@@ -244,38 +244,37 @@ serve(async (req) => {
         );
       }
 
-      // Procesar en chunks o de a uno (Upsert)
-      const results = [];
-      for (const row of body) {
-        if (!row.nombre || !row.cedula) continue;
-        
-        const { data, error } = await supabase
-          .from("personas")
-          .upsert(
-            {
-              nombre: row.nombre,
-              cedula: row.cedula,
-              edad: row.edad ? parseInt(row.edad, 10) : null,
-              ultima_ubicacion: row.ultima_ubicacion || null,
-              telefono_contacto: row.telefono_contacto || null,
-              observaciones: row.observaciones || null,
-              estado: row.estado || "Desaparecido",
-              ubicacion_encontrado: row.ubicacion_encontrado || null,
-              es_menor: !!row.es_menor
-            },
-            { onConflict: "cedula" }
-          )
-          .select();
+      const validRows = body
+        .filter((row: any) => row.nombre && row.cedula)
+        .map((row: any) => ({
+          nombre: row.nombre,
+          cedula: row.cedula,
+          edad: row.edad ? parseInt(row.edad, 10) : null,
+          ultima_ubicacion: row.ultima_ubicacion || null,
+          telefono_contacto: row.telefono_contacto || null,
+          observaciones: row.observaciones || null,
+          estado: row.estado || "Desaparecido",
+          ubicacion_encontrado: row.ubicacion_encontrado || null,
+          es_menor: !!row.es_menor,
+        }));
 
-        if (error) {
-          results.push({ cedula: row.cedula, status: "error", error: error.message });
-        } else {
-          results.push({ cedula: row.cedula, status: "success" });
-        }
+      const skipped = body.length - validRows.length;
+
+      if (validRows.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "No hay filas válidas. Cada fila requiere nombre y cédula." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
+      const { error } = await supabase
+        .from("personas")
+        .upsert(validRows, { onConflict: "cedula" });
+
+      if (error) throw error;
+
       return new Response(
-        JSON.stringify({ message: "Importación completada", results }),
+        JSON.stringify({ message: "Importación completada", inserted: validRows.length, skipped }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
