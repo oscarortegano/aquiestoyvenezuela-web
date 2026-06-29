@@ -182,7 +182,8 @@ serve(async (req) => {
     // 4. PUT /personas/:id/status (Privado - Actualizar Estatus)
     const statusMatch = path.match(/^\/personas\/(\d+)\/status$/);
     if (statusMatch && method === "PUT") {
-      await verifyAdmin();
+      const adminUser = await verifyAdmin();
+      console.log(`[PUT /personas/:id/status] user=${adminUser.email ?? adminUser.id}`);
       const id = statusMatch[1];
       const body = await req.json();
 
@@ -216,7 +217,8 @@ serve(async (req) => {
     // 4.1 DELETE /personas/:id (Privado - Eliminar Reporte)
     const deleteMatch = path.match(/^\/personas\/(\d+)$/);
     if (deleteMatch && method === "DELETE") {
-      await verifyAdmin();
+      const adminUser = await verifyAdmin();
+      console.log(`[DELETE /personas/:id] user=${adminUser.email ?? adminUser.id}`);
       const id = deleteMatch[1];
       const { data, error } = await supabase
         .from("personas")
@@ -234,7 +236,8 @@ serve(async (req) => {
 
     // 5. POST /import-csv (Privado - Carga Masiva)
     if (path === "/import-csv" && method === "POST") {
-      await verifyAdmin();
+      const adminUser = await verifyAdmin();
+      console.log(`[POST /import-csv] user=${adminUser.email ?? adminUser.id}`);
       const body = await req.json(); // Array de registros parsed
       
       if (!Array.isArray(body)) {
