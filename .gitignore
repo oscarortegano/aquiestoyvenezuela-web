@@ -13,3 +13,7 @@ backups/
 node_modules/
 dist/
 build/
+
+# Claude Code
+.claude/
+CLAUDE.md
