@@ -349,7 +349,7 @@ header p {
 /* Person Cards Grid */
 .cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.5rem;
     margin-top: 1.5rem;
 }
@@ -1035,6 +1035,13 @@ footer p {
     margin-bottom: 6px;
 }
 
+/* Form Row (2-col grid in modals) */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     header h1 { font-size: 1.8rem; }
@@ -1047,6 +1054,31 @@ footer p {
     .csv-upload-wrapper .btn { width: 100%; }
     .filters-bar { flex-direction: column; align-items: stretch; }
     .filter-group { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+}
+
+@media (max-width: 480px) {
+    header { padding: 1.25rem 0.75rem 1rem; }
+    header p { font-size: 0.9rem; margin-bottom: 1rem; }
+    .logo-img { max-width: 220px; }
+    .stat-card { padding: 0.6rem 0.4rem; }
+    .stat-value { font-size: 1.1rem; }
+    .stat-label { font-size: 0.65rem; }
+    .container { padding: 0 0.75rem 3rem; }
+    .search-section-wrapper { gap: 0.75rem; }
+    .cards-grid { grid-template-columns: 1fr; gap: 1rem; }
+    .person-card { padding: 1.1rem; }
+    .toggle-list-container .btn { width: 100%; }
+    .registration-bubble { padding: 1.25rem 1rem; }
+    .form-row { grid-template-columns: 1fr; }
+    .form-footer { flex-direction: column-reverse; gap: 0.5rem; }
+    .form-footer .btn { width: 100%; }
+    .modal-content { border-radius: 16px; }
+    .modal-header { padding: 1rem; }
+    .modal-header h3 { font-size: 1.1rem; }
+    .modal-body { padding: 1rem; max-height: 70vh; }
+    .toast { min-width: unset; width: 100%; }
+    .admin-panel { padding: 1rem; }
+    .admin-panel h3 { font-size: 1.05rem; }
 }
 
 /* Globo de Búsqueda y Registro (Speech Bubbles) */
@@ -1083,13 +1115,13 @@ footer p {
     max-width: 550px;
     width: 100%;
     margin: 1.5rem auto 0 auto;
-    background: rgba(30, 41, 59, 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: var(--bg-secondary);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(220, 38, 38, 0.25);
     border-radius: 24px;
     padding: 2rem;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), var(--glass-shadow);
+    box-shadow: var(--glass-shadow);
     position: relative;
     animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -1103,11 +1135,11 @@ footer p {
     transform: translateX(-50%);
     border-width: 0 10px 10px 10px;
     border-style: solid;
-    border-color: transparent transparent rgba(30, 41, 59, 0.85) transparent;
+    border-color: transparent transparent var(--bg-secondary) transparent;
 }
 
 .registration-bubble h4 {
-    color: #f87171;
+    color: var(--status-missing);
     font-size: 1.2rem;
     margin-bottom: 0.5rem;
     text-align: center;
