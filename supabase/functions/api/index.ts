@@ -1,6 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -31,12 +38,12 @@ serve(async (req) => {
   // Helper para verificar si el usuario está autenticado como administrador
   async function verifyAdmin() {
     if (!authHeader) {
-      throw new Error("Missing authorization header");
+      throw new HttpError(401, "Missing authorization header");
     }
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
-      throw new Error("Unauthorized admin user");
+      throw new HttpError(401, "Unauthorized admin user");
     }
     return user;
   }
@@ -135,7 +142,10 @@ serve(async (req) => {
       query = query.range(offset, offset + limit - 1);
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error(JSON.stringify({ level: "error", op: "GET /personas", message: error.message, code: error.code }));
+        throw error;
+      }
 
       return new Response(
         JSON.stringify(data),
@@ -171,7 +181,10 @@ serve(async (req) => {
         ])
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error(JSON.stringify({ level: "error", op: "POST /personas", message: error.message, code: error.code }));
+        throw error;
+      }
 
       return new Response(
         JSON.stringify(data[0]),
@@ -205,7 +218,10 @@ serve(async (req) => {
         .eq("id", id)
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error(JSON.stringify({ level: "error", op: "PUT /personas/:id/status", message: error.message, code: error.code }));
+        throw error;
+      }
 
       return new Response(
         JSON.stringify(data[0]),
@@ -224,7 +240,10 @@ serve(async (req) => {
         .eq("id", id)
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error(JSON.stringify({ level: "error", op: "DELETE /personas/:id", message: error.message, code: error.code }));
+        throw error;
+      }
 
       return new Response(
         JSON.stringify(data ? data[0] : null),
@@ -271,7 +290,10 @@ serve(async (req) => {
         .from("personas")
         .upsert(validRows, { onConflict: "cedula" });
 
-      if (error) throw error;
+      if (error) {
+        console.error(JSON.stringify({ level: "error", op: "POST /import-csv", message: error.message, code: error.code }));
+        throw error;
+      }
 
       return new Response(
         JSON.stringify({ message: "Importación completada", inserted: validRows.length, skipped }),
@@ -285,10 +307,22 @@ serve(async (req) => {
       { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (err: any) {
-    const status = err.message === "Unauthorized admin user" || err.message === "Missing authorization header" ? 401 : 500;
+  } catch (err) {
+    const status = err instanceof HttpError ? err.status : 500;
+    const message = err instanceof Error ? err.message : "Error interno del servidor";
+
+    if (status >= 500) {
+      console.error(JSON.stringify({
+        level: "error",
+        message,
+        stack: err instanceof Error ? err.stack : undefined,
+        method: req.method,
+        path: url.pathname,
+      }));
+    }
+
     return new Response(
-      JSON.stringify({ error: err.message || "Error interno del servidor" }),
+      JSON.stringify({ error: message }),
       { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
