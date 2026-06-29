@@ -1,0 +1,83 @@
+name: "Tarea de desarrollo"
+description: "Plantilla estructurada para definir tareas claras, con contexto técnico, restricciones y criterios de aceptación."
+title: "[TASK]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Instrucciones para crear la tarea
+        Define esta tarea pensando en que será leída por un desarrollador o procesada por una IA. **Sé explícito con los archivos, las dependencias y los límites.**
+
+  - type: input
+    id: summary
+    attributes:
+      label: "Objetivo Principal"
+      placeholder: "Ej: Crear un endpoint GET /api/users que retorne la lista de usuarios activos."
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Contexto y Propósito (El 'Por qué')"
+      description: "Explica brevemente por qué estamos haciendo esto. La IA y los DEVs necesitan contexto del negocio para tomar buenas decisiones estructurales."
+      placeholder: "Actualmente los administradores no pueden ver quien está buscando. Necesitamos esta data para poblar el dashboard de métricas en tiempo real..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical_constraints
+    attributes:
+      label: "Restricciones Técnicas y Archivos Clave (Constraints)"
+      description: "Fundamental para la IA: Especifica qué archivos modificar, qué librerías usar y qué patrones arquitectónicos seguir (o evitar)."
+      value: |
+        **Archivos involucrados:**
+        - `src/...`
+        
+        **Librerías a utilizar:**
+        - 
+        
+        **Lo que NO se debe hacer (Anti-patrones):**
+        - 
+    validations:
+      required: true
+
+  - type: textarea
+    id: io_examples
+    attributes:
+      label: "Comportamiento Esperado (Ejemplos de Input / Output)"
+      description: "La forma más efectiva de alinear a una IA. Provee ejemplos de cómo debe lucir la entrada y la salida esperada."
+      placeholder: |
+        **Input (Request):** GET /api/users?status=active
+        **Output (Response):** 
+        {
+          "data": [{ "id": 1, "name": "Jean", "status": "active" }]
+        }
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: "Criterios de Aceptación (Definition of Done)"
+      description: "Checklist estricto de lo que debe cumplirse para que el PR sea aprobado."
+      value: |
+        - [ ] El código cumple con el objetivo principal.
+        - [ ] Se implementaron pruebas unitarias (Unit tests).
+        - [ ] El tipado (Types/Interfaces) es estricto y no usa `any`.
+        - [ ] Maneja correctamente los errores y excepciones.
+        - [ ] Pasa la revisión automática del linter.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: "Nivel de Complejidad Estimado"
+      options:
+        - "Baja (Ideal para Juniors / Quick Win para IA)"
+        - "Media (Requiere conocer la arquitectura)"
+        - "Alta (Cambios core o integraciones complejas)"
+    validations:
+      required: true
