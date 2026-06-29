@@ -46,7 +46,23 @@ Qué es el proyecto, qué hace hoy, qué está verificado, qué riesgos existen 
 - [Origen, recorrido y destino de los datos](#origen-recorrido-y-destino-de-los-datos)
 - [Calidad y confiabilidad de la información](#calidad-y-confiabilidad-de-la-información)
 - [Seguridad y privacidad](#seguridad-y-privacidad)
-- [Arquitectura actual](#arquitectura-actual)
+- [Arquitectura técnica del proyecto](#arquitectura-técnica-del-proyecto)
+  - [Vista general](#vista-general)
+  - [Diagrama de arquitectura actual](#diagrama-de-arquitectura-actual)
+  - [Componentes y responsabilidades](#componentes-y-responsabilidades)
+  - [Mapa de código](#mapa-de-código)
+  - [Modos de operación](#modos-de-operación)
+  - [Flujo técnico de una consulta](#flujo-técnico-de-una-consulta-de-búsqueda)
+  - [Flujo técnico de escritura](#flujo-técnico-de-escritura-y-administración)
+  - [Autenticación y autorización](#autenticación-y-autorización)
+  - [Arquitectura de datos](#arquitectura-de-datos)
+  - [Fronteras de seguridad](#fronteras-de-seguridad-actuales)
+  - [Arquitectura de despliegue](#arquitectura-de-despliegue)
+  - [Stack técnico](#stack-técnico)
+  - [Dependencias externas](#dependencias-externas)
+  - [Decisiones y deuda técnica](#decisiones-arquitectónicas-y-deuda-técnica)
+  - [Arquitectura actual frente a objetivo](#arquitectura-actual-frente-a-objetivo)
+  - [Cómo modificar el sistema](#cómo-modificar-el-sistema-de-forma-segura)
 - [Estado técnico verificable](#estado-técnico-verificable)
 - [Ejecución local](#ejecución-local)
 - [Despliegue](#despliegue)
@@ -278,53 +294,436 @@ No se encontraron scripts de backup en el repositorio. Sin embargo, Supabase ofr
 
 ---
 
-## Arquitectura actual
+## Arquitectura técnica del proyecto
+
+> Para detalle técnico profundo, ver [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
+### Vista general
+
+La aplicación es una **SPA (Single Page Application)** construida con HTML, CSS y JavaScript vanilla, sin framework ni proceso de build. Toda la interacción con el usuario ocurre en el navegador. Para consultar y modificar información, el frontend puede utilizar una **Edge Function de Supabase** (Deno + TypeScript) como camino preferido, o acceder **directamente a Supabase** mediante el cliente JS como ruta alternativa cuando la Edge Function no responde. Además, dispone de un **modo sandbox** basado en `localStorage` que permite probar la aplicación completa sin backend.
+
+Los archivos estáticos se sirven mediante **Nginx** dentro de un contenedor **Docker**. La base de datos, autenticación, almacenamiento de archivos y Edge Function son provistos por **Supabase** como plataforma managed.
+
+### Diagrama de arquitectura actual
+
+El siguiente diagrama muestra los componentes reales del sistema y cómo se conectan. Los componentes verificados en código se muestran con borde sólido; los configurados pero no verificados en producción, con borde discontinuo.
 
 ```mermaid
 flowchart TD
-    subgraph "Usuarios"
-        U[Usuario público]
-        A[Administrador]
+    U[Usuario público] --> WEB
+    A[Administrador] --> ADMIN["/admin<br/>redirección"]
+    ADMIN --> WEB
+
+    subgraph NAVEGADOR["Navegador — Frontend"]
+        WEB["index.html + app.js<br/>SPA vanilla JS"]
+        CONFIG["config.js<br/>SUPABASE_URL + ANON_KEY"]
+        DEMO["localStorage<br/>modo sandbox"]
     end
 
-    subgraph "Frontend — Navegador"
-        WEB[index.html + app.js / SPA vanilla JS]
-        DEMO[localStorage / modo sandbox]
+    subgraph SUPABASE["Supabase — Backend"]
+        EF["Edge Function /api<br/>Deno + TypeScript"]
+        DB[("PostgreSQL<br/>public.personas")]
+        AUTH["Supabase Auth<br/>email + contraseña"]
+        ST["Storage<br/>bucket fotos-personas"]
     end
 
-    subgraph "Supabase — Backend"
-        EF[Edge Function /api / Deno TypeScript]
-        DB[(PostgreSQL / public.personas)]
-        AUTH[Supabase Auth]
-        ST[Storage / fotos-personas]
+    subgraph DOCKER["Docker — Servidor"]
+        NGINX["Nginx Alpine<br/>sirve archivos estáticos"]
     end
-
-    U -->|Busca / registra / comparte| WEB
-    A -->|Login via /admin| WEB
 
     WEB -->|Camino preferido| EF
     WEB -->|Fallback si EF no responde| DB
-    WEB -.->|Sin configuración| DEMO
-
+    WEB -.->|Sin config.js| DEMO
+    CONFIG --> WEB
     EF --> DB
     EF --> AUTH
-    ST --> AUTH
+    WEB --> AUTH
+    NGINX --> WEB
 
-    WEB -->|Enlace| WA["WhatsApp / (solo deep link)"]
-    WEB -->|Enlace| RS[Redes sociales]
+    style DEMO stroke-dasharray: 5 5
+    style EF stroke-dasharray: 5 5
+    style DB stroke-dasharray: 5 5
+    style AUTH stroke-dasharray: 5 5
+    style ST stroke-dasharray: 5 5
+    style NGINX stroke-dasharray: 5 5
 ```
 
-> **Etiquetas**: ▬▬ Verificado en código &nbsp; - - - Probado localmente &nbsp; ···· Configurado, no verificado
+**Conclusiones principales**:
+- El navegador es el entorno principal: toda la lógica de UI, validación de formularios y renderizado ocurre en `app.js`.
+- Hay **tres caminos de ejecución** que deben mantenerse sincronizados: Edge Function, acceso directo a Supabase, y sandbox.
+- Los componentes de Supabase están **configurados en código** pero su despliegue real **no pudo verificarse**.
+- Docker/Nginx están configurados pero tienen un **error que impide iniciar** con la configuración actual.
 
-### Dualidad de comunicación (API vs acceso directo)
+### Componentes y responsabilidades
 
-| Camino | Cuándo se usa | Tecnología |
-|--------|:------------:|------------|
-| **Edge Function** | Preferido — intenta llamar a la API primero | Deno (TypeScript) en Supabase |
-| **Supabase JS directo** | Si la Edge Function no responde | Cliente JS en el navegador |
-| **Sandbox** | Si no existe `config.js` | localStorage del navegador |
+| Componente | Tecnología o archivo | Responsabilidad | Lugar de ejecución | Estado |
+|-----------|----------------------|-----------------|-------------------|:------:|
+| Página principal | `index.html` | Estructura HTML de la SPA: búsqueda, filtros, tarjetas, modales | Navegador | Verificado en código |
+| Redirección admin | `admin/index.html` | Setea flag en `sessionStorage` y redirige a `/` para activar login | Navegador | Verificado en código |
+| Lógica frontend | `static/js/app.js` | Búsqueda, filtros, render, modales, admin, CSV, sandbox | Navegador | Verificado en código |
+| Configuración | `static/js/config.example.js` | Template con `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `WHATSAPP_PHONE` | Navegador | Verificado en código |
+| Estilos | `static/css/style.css` | Diseño visual, responsive, glassmorphism | Navegador | Verificado en código |
+| Cliente Supabase | CDN `@supabase/supabase-js@2` | Cliente JS para Auth y acceso directo a PostgreSQL | Navegador | Verificado en código |
+| Edge Function | `supabase/functions/api/index.ts` | API REST: stats, búsqueda, registro, estado, eliminación, CSV | Supabase (Deno) | Configurado, no verificado |
+| Base de datos | `schema.sql` → PostgreSQL | Tabla `personas`, RLS, índices, bucket storage | Supabase | Configurado, no verificado |
+| Autenticación | Supabase Auth | Login de administradores con email + contraseña | Supabase | Configurado, no verificado |
+| Storage | Supabase Storage | Bucket `fotos-personas` para fotografías | Supabase | Configurado, sin interfaz |
+| CSV parser | CDN `PapaParse 5.4.1` | Lectura de archivos CSV en el navegador | Navegador | Verificado en código |
+| Sandbox | `localStorage` del navegador | Datos demo, admin demo, pruebas sin backend | Navegador | Probado localmente |
+| Servidor web | Nginx Alpine en Docker | Sirve archivos estáticos, proxy, SSL | Contenedor Docker | Configurado, no funcional |
 
-> ⚠️ **Implicación de seguridad**: el fallback directo a Supabase JS evita las validaciones de la Edge Function y depende exclusivamente de las políticas RLS para control de acceso.
+### Mapa de código
+
+| Ruta | Responsabilidad | Cuándo modificarla | Dependencias |
+|------|----------------|-------------------|--------------|
+| `index.html` | Estructura HTML de la SPA | Cambios de UI, nuevos elementos, modales | `app.js`, `style.css` |
+| `admin/index.html` | Redirección para login admin | Cambios en flujo de acceso admin | `app.js` (lee `sessionStorage`) |
+| `static/js/app.js` | Toda la lógica del frontend | Cambios de comportamiento, búsqueda, admin, CSV | `config.js`, Supabase JS, PapaParse |
+| `static/js/config.example.js` | Template de configuración | Cambiar variables de configuración soportadas | Ninguna |
+| `static/css/style.css` | Estilos visuales | Cambios de diseño, responsive, dark mode | `index.html` |
+| `schema.sql` | Esquema de base de datos | Cambios de tabla, RLS, índices, bucket | Edge Function, `app.js` (fallback) |
+| `supabase/functions/api/index.ts` | API REST (Edge Function) | Cambios de endpoints, validaciones, autorización | `schema.sql`, `app.js` |
+| `Dockerfile` | Imagen Docker con Nginx | Cambios de empaquetado | `nginx.conf`, `index.html`, `static/` |
+| `docker-compose.yml` | Orquestación del contenedor | Cambios de puertos, volúmenes, servicios | `Dockerfile` |
+| `nginx.conf` | Configuración de Nginx | Cambios de SSL, proxy, headers | `Dockerfile` |
+| `README.md` | Este documento | Actualizar estado, arquitectura, guía | Todos los docs |
+| `docs/` | Documentación especializada | Actualizar tras cambios arquitectónicos | `README.md` |
+
+### Modos de operación
+
+El sistema tiene **tres modos de operación** que coexisten en el mismo archivo `app.js`. Esto significa que cualquier cambio de lógica debe reflejarse en los tres caminos.
+
+#### Modo con Edge Function (preferido)
+
+- **URL**: `${SUPABASE_URL}/functions/v1/api/...`
+- **Autenticación admin**: header `Authorization: Bearer <token>` con JWT de Supabase Auth
+- **Validaciones**: la Edge Function valida nombre y cédula obligatorios, verifica duplicado por cédula, fuerza `estado: 'Desaparecido'` en registros nuevos
+- **Endpoints**: `GET /stats`, `GET /personas`, `POST /personas`, `PUT /personas/:id/status`, `DELETE /personas/:id`, `POST /import-csv`
+- **Errores**: si la Edge Function no responde, el frontend cae automáticamente al acceso directo
+
+#### Acceso directo a Supabase (fallback)
+
+- **Cuándo se usa**: cuando la Edge Function no responde o no está desplegada
+- **Mecanismo**: `supabaseClient.from('personas').select('*')` directamente desde el navegador
+- **Autenticación**: usa `SUPABASE_ANON_KEY` en header `apikey`
+- **Control de acceso**: depende **exclusivamente** de las políticas RLS de PostgreSQL
+- **Lógica duplicada**: las validaciones que hace la Edge Function (duplicado por cédula, campos obligatorios) se replican en el frontend
+- **Riesgo**: el fallback **evita las validaciones del servidor** y depende solo de RLS, que actualmente permite SELECT e INSERT públicos
+
+#### Modo sandbox (demo)
+
+- **Cuándo se activa**: si no existe `config.js` o si `SUPABASE_URL` contiene el valor placeholder
+- **Almacenamiento**: `localStorage` con clave `personas_demo` (5 registros ficticios)
+- **Admin demo**: `admin@example.com` / `change-me` (hardcodeado en `app.js`)
+- **Sesión**: `sessionStorage` con clave `admin_session_demo`
+- **Útil para**: desarrollo local, onboarding, pruebas visuales
+- **No suficiente para**: probar RLS, Auth real, Edge Function, Storage, ni comportamiento con datos reales
+
+| Modo | Backend | Almacenamiento | Autenticación | Uso recomendado | Limitación |
+|------|---------|---------------|--------------|-----------------|------------|
+| Edge Function | Supabase Deno | PostgreSQL | JWT + verifyAdmin | Producción | No verificado desplegado |
+| Acceso directo | Supabase JS | PostgreSQL | Anon key + RLS | Fallback de emergencia | Sin validación de servidor |
+| Sandbox | Ninguno | localStorage | Credenciales hardcodeadas | Desarrollo y demo | No prueba backend real |
+
+> [!WARNING]
+> Un cambio en la API puede requerir actualizar también el camino de acceso directo y el sandbox mientras esos tres modos continúen coexistiendo.
+
+### Flujo técnico de una consulta de búsqueda
+
+Cuando un usuario escribe un nombre o cédula y presiona Enter, el frontend construye una consulta con filtros y paginación. El siguiente diagrama muestra los tres caminos posibles:
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant W as app.js
+    participant EF as Edge Function
+    participant DB as PostgreSQL
+    participant LS as localStorage
+
+    U->>W: Escribe búsqueda + filtros
+    W->>W: Debounce 300ms
+    W->>W: Muestra skeletons
+
+    alt Edge Function disponible
+        W->>EF: GET /personas?q=...&category=...&estado=...&edad=...&page=...&limit=...
+        EF->>DB: SELECT con ILIKE, filtros, paginación
+        DB-->>EF: Resultados
+        EF-->>W: JSON con personas
+    else Fallback directo
+        W->>DB: supabase.from('personas').select('*').ilike(...)
+        DB-->>W: Resultados
+    else Modo sandbox
+        W->>LS: Filtra localStorage
+        LS-->>W: Resultados demo
+    end
+
+    W->>W: Renderiza tarjetas
+    W-->>U: Muestra resultados o "No encontrado"
+```
+
+**Parámetros de búsqueda**: `q` (texto), `category` (todo/cédula/nombre/apellido), `status` (Desaparecido/Encontrado), `edad` (rango), `orden` (recientes/nombre/edad), `tipoUbicacion` (hospital/refugio), `ubicacion` (texto), `page` y `limit` (paginación).
+
+**Diferencia entre caminos**: la Edge Function construye la consulta SQL en el servidor; el fallback construye la consulta con el cliente Supabase JS en el navegador. El sandbox filtra un array en memoria. Los resultados pueden diferir si la lógica de filtros no está perfectamente sincronizada.
+
+### Flujo técnico de escritura y administración
+
+El siguiente diagrama muestra cómo se crean, actualizan y eliminan registros, incluyendo la importación CSV:
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario/Admin
+    participant W as app.js
+    participant EF as Edge Function
+    participant DB as PostgreSQL
+
+    Note over W: Registro público
+    U->>W: Completa formulario
+    W->>W: Valida nombre + cédula
+    W->>W: Verifica duplicado por cédula
+    W->>EF: POST /personas
+    EF->>DB: INSERT estado='Desaparecido'
+    EF-->>W: 201 Created
+    W-->>U: Confirmación
+
+    Note over W: Cambio de estado (admin)
+    U->>W: Selecciona "Encontrado"
+    W->>EF: PUT /personas/:id/status
+    EF->>EF: verifyAdmin (JWT)
+    EF->>DB: UPDATE estado + ubicacion
+    EF-->>W: 200 OK
+
+    Note over W: Eliminación (admin)
+    U->>W: Confirma eliminación
+    W->>EF: DELETE /personas/:id
+    EF->>EF: verifyAdmin (JWT)
+    EF->>DB: DELETE fila
+    EF-->>W: 200 OK
+
+    Note over W: Importación CSV (admin)
+    U->>W: Selecciona archivo CSV
+    W->>W: PapaParse lee + mapea columnas
+    W->>W: Fuerza estado='Desaparecido'
+    W->>EF: POST /import-csv
+    EF->>EF: verifyAdmin (JWT)
+    EF->>DB: UPSERT por cédula
+    EF-->>W: Resumen insertados/actualizados
+```
+
+> [!CAUTION]
+> La importación CSV **siempre fuerza `estado: 'Desaparecido'`** en todos los registros. Si una persona ya estaba marcada como "Encontrado", una reimportación la revierte. Ver [Calidad de datos](#calidad-y-confiabilidad-de-la-información).
+
+### Autenticación y autorización
+
+| Concepto | Significado | Estado actual |
+|----------|-------------|:------------:|
+| **Autenticación** | Verificar quién es el usuario | Supabase Auth (email + contraseña) |
+| **Autorización** | Verificar qué puede hacer | `verifyAdmin()` — solo verifica autenticación, **no rol** |
+| **RLS** | Row Level Security de PostgreSQL | SELECT público, INSERT público, UPDATE/DELETE para authenticated |
+| **Sesión** | Token JWT persistido | Supabase Auth guarda sesión en `localStorage` del navegador |
+| **Rol** | Nivel de permiso (admin, moderador, visor) | **No implementado** — cualquier authenticated es admin efectivo |
+
+**Flujo de login**:
+1. El administrador visita `/admin`
+2. `admin/index.html` setea `sessionStorage.triggerAdminLogin = 'true'` y redirige a `/`
+3. `app.js` detecta el flag, abre el modal de login
+4. El usuario ingresa email + contraseña
+5. `supabaseClient.auth.signInWithPassword()` valida contra Supabase Auth
+6. Supabase devuelve un JWT que se persiste en `localStorage`
+7. `onAuthStateChange` activa el panel admin
+
+**Brecha crítica**: `verifyAdmin()` en la Edge Function (`api/index.ts:32-42`) solo llama `supabase.auth.getUser(token)` — verifica que el token sea válido, pero **no verifica que el usuario tenga rol de administrador**. Combinado con RLS que permite UPDATE/DELETE a cualquier `authenticated`, cualquier usuario registrado en Supabase Auth puede modificar o eliminar registros.
+
+### Arquitectura de datos
+
+El modelo actual tiene una **sola tabla** sin relaciones:
+
+```mermaid
+erDiagram
+    personas {
+        bigint id PK "GENERATED ALWAYS AS IDENTITY"
+        text nombre "NOT NULL"
+        text cedula "NOT NULL — UNIQUE"
+        integer edad
+        text ultima_ubicacion
+        text telefono_contacto "Sensible — expuesto públicamente"
+        text observaciones "Sensible — expuesto públicamente"
+        text estado "NOT NULL — CHECK Desaparecido/Encontrado"
+        text ubicacion_encontrado
+        text encontrado_por "Sensible — expuesto públicamente"
+        text encontrado_por_cedula "Sensible — expuesto públicamente"
+        boolean es_menor "NOT NULL — DEFAULT false"
+        text foto_url
+        timestamptz fecha_registro "DEFAULT now()"
+        timestamptz fecha_actualizacion "DEFAULT now()"
+    }
+```
+
+**Clave única**: `cedula` tiene restricción UNIQUE — previene duplicados exactos. Sin embargo, el formulario normaliza la cédula (sin puntos, con prefijo V-/E-) mientras que el CSV no la normaliza, lo que permite duplicados por formato (`V-12345678` vs `V-12.345.678`).
+
+**Índices**: 7 índices incluyendo B-tree (estado+fecha, edad, nombre) y GIN trigram (nombre, cédula, ubicaciones) para búsqueda por substring.
+
+**Estados**: solo dos valores permitidos por CHECK constraint: `Desaparecido` y `Encontrado`.
+
+**Bucket de fotos**: `fotos-personas` configurado como público en `schema.sql`. Sin interfaz de carga en el frontend.
+
+**Importación CSV**: usa `upsert` con `onConflict: 'cedula'` — actualiza si existe, inserta si no. El cliente siempre envía `estado: 'Desaparecido'`, lo que sobrescribe registros existentes.
+
+> Para detalle de calidad de datos, ver [Calidad y confiabilidad de la información](#calidad-y-confiabilidad-de-la-información) y [docs/DATA_SOURCES_STORAGE_AND_HOSTING.md](./docs/DATA_SOURCES_STORAGE_AND_HOSTING.md).
+
+### Fronteras de seguridad actuales
+
+| Frontera | Control actual | Brecha | Recomendación |
+|----------|---------------|--------|---------------|
+| Navegador | Entorno no confiable | El frontend expone `SUPABASE_ANON_KEY` (publicable por diseño) | Normal — la clave es publicable bajo RLS |
+| RLS (PostgreSQL) | SELECT público, INSERT público, UPDATE/DELETE authenticated | **No separa columnas públicas de privadas** — toda la fila es visible | Crear vista pública sin columnas sensibles |
+| Edge Function | `verifyAdmin()` verifica JWT | **No verifica rol** — cualquier authenticated es admin | Implementar verificación de rol real |
+| Supabase Auth | email + contraseña | Sin roles diferenciados | Agregar `app_metadata.role` o tabla de roles |
+| CORS | `Access-Control-Allow-Origin: *` | Permite cualquier origen | Restringir a dominios conocidos (defensa complementaria) |
+| Storage | Bucket público con INSERT público | Cualquiera puede subir archivos | Restringir a autenticados + validar tipo MIME |
+| Frontend | `escapeHTML()` en render | `onclick` inline con datos de usuario — posible XSS | Usar `addEventListener` + `dataset` |
+
+> CORS solo limita navegadores — no detiene scripts, curl ni llamadas directas a la API REST de Supabase. La protección real de datos depende de RLS. Ver [docs/AUDIT_CURRENT_STATE.md](./docs/AUDIT_CURRENT_STATE.md).
+
+### Arquitectura de despliegue
+
+```mermaid
+flowchart LR
+    subgraph BUILD["Construcción"]
+        GIT["GitHub<br/>repositorio"]
+        DOCKER["Docker build<br/>nginx:alpine"]
+    end
+
+    subgraph SERVE["Servidor"]
+        NGINX["Nginx<br/>puerto 80"]
+        FILES["index.html<br/>static/<br/>schema.sql"]
+    end
+
+    subgraph SUPA["Supabase (externo)"]
+        AUTH["Auth"]
+        EF["Edge Function"]
+        DB["PostgreSQL"]
+        ST["Storage"]
+    end
+
+    subgraph CLIENTE["Navegador"]
+        APP["app.js<br/>+ Supabase JS"]
+    end
+
+    GIT --> DOCKER --> NGINX
+    NGINX --> FILES --> APP
+    APP -->|HTTPS| EF
+    APP -->|HTTPS| AUTH
+    APP -->|HTTPS| DB
+    EF --> DB
+    AUTH --> DB
+
+    style NGINX stroke-dasharray: 5 5
+    style EF stroke-dasharray: 5 5
+    style DB stroke-dasharray: 5 5
+    style AUTH stroke-dasharray: 5 5
+    style ST stroke-dasharray: 5 5
+```
+
+**Construcción de la imagen Docker**:
+- `Dockerfile` copia `index.html`, `static/`, `schema.sql` y `nginx.conf` a la imagen Nginx Alpine
+- **No copia** `admin/index.html` — la ruta `/admin` no funciona dentro del contenedor
+- `schema.sql` se copia al document root — queda **expuesto públicamente**
+- `docker-compose.yml` solo mapea puerto `80:80` (no 443)
+
+**Nginx**:
+- Configurado para HTTPS con certificados Let's Encrypt en `/etc/letsencrypt/...`
+- Sin embargo, `docker-compose.yml` no monta volúmenes para certificados ni expone 443
+- El redirect `return 301 https://...` hace que nginx **no pueda iniciar** sin certificados
+
+**Edge Function**: se despliega por separado con `supabase functions deploy api`. No forma parte de la imagen Docker.
+
+**Variables necesarias**: `SUPABASE_URL` y `SUPABASE_ANON_KEY` en `static/js/config.js` (creado manualmente, ignorado por Git).
+
+### Stack técnico
+
+| Capa | Tecnología | Función | Estado |
+|------|-----------|---------|:------:|
+| Interfaz | HTML5 + CSS3 | Estructura y estilo | Verificado en código |
+| Lógica frontend | JavaScript vanilla (sin framework) | Interacción, búsqueda, admin, CSV | Verificado en código |
+| Cliente Supabase | `@supabase/supabase-js@2` (CDN) | Auth y acceso directo a PostgreSQL | Verificado en código |
+| CSV parser | PapaParse 5.4.1 (CDN) | Lectura de CSV en navegador | Verificado en código |
+| API | Supabase Edge Functions (Deno + TypeScript) | Endpoints REST para CRUD | Configurado, no verificado |
+| Base de datos | PostgreSQL (Supabase) | Tabla `personas`, RLS, índices | Configurado, no verificado |
+| Autenticación | Supabase Auth | Login admin con email + contraseña | Configurado, no verificado |
+| Almacenamiento | Supabase Storage | Bucket `fotos-personas` | Configurado, sin interfaz |
+| Servidor web | Nginx Alpine | Servir archivos estáticos | Configurado, no funcional |
+| Contenedores | Docker + docker-compose | Empaquetar y desplegar | Configurado, no funcional |
+| CI/CD | — | — | No encontrado |
+| Tests | — | — | No encontrado |
+
+### Dependencias externas
+
+| Dependencia | Forma de carga | Versión | Uso | Riesgo |
+|------------|---------------|---------|-----|--------|
+| Supabase JS | CDN jsdelivr | `@2` (sin patch) | Cliente Auth + PostgreSQL | Sin SRI — si el CDN se compromete, se inyecta JS arbitrario |
+| PapaParse | CDN cloudflare | `5.4.1` | Parseo de CSV en navegador | Sin SRI — mismo riesgo |
+| Google Fonts | CDN | Sin versión fija | Tipografía | Dependencia de disponibilidad |
+
+> [!IMPORTANT]
+> Ningún script CDN tiene atributo `integrity` (SRI). Si un CDN se compromete, un atacante podría inyectar JavaScript arbitrario en la aplicación.
+
+### Decisiones arquitectónicas y deuda técnica
+
+#### Decisiones encontradas o inferidas
+
+| Decisión | Evidencia | Estado | Consecuencia |
+|----------|-----------|:------:|-------------|
+| SPA vanilla sin framework | Sin `package.json`, sin build | Inferida | Carga rápida, pero `app.js` monolítico de 1791 líneas |
+| Failover API → Supabase directo | `app.js` try/catch con fallback | Inferida | Resiliencia, pero lógica duplicada en dos lenguajes |
+| localStorage como sandbox | `setupSandboxMode()` en `app.js` | Inferida | Demo sin backend, pero tres caminos que mantener |
+| Cédula como clave única | `UNIQUE` en `schema.sql` | Inferida | Previene duplicados exactos, pero no por formato |
+| Sin tabla de auditoría | No existe en `schema.sql` | Inferida | No se puede rastrear quién cambió qué |
+
+> Estas decisiones fueron **inferidas** por el auditor a partir del código. No son ADRs formalmente aceptados por el equipo.
+
+#### Deuda técnica relevante
+
+| Tema | Impacto | Riesgo | Detalle en |
+|------|:-------:|-------|:----------:|
+| Lógica duplicada API + fallback | Medio | Divergencia entre caminos | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
+| `app.js` monolítico (1791 líneas) | Medio | Difícil mantenimiento y testing | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
+| Sin tests automatizados | Alto | Regresiones no detectadas | [AUDIT_CURRENT_STATE.md](./docs/AUDIT_CURRENT_STATE.md) |
+| Sin roles administrativos | Crítico | Cualquier authenticated es admin | [AUDIT_CURRENT_STATE.md](./docs/AUDIT_CURRENT_STATE.md) |
+| Sin separación de datos públicos/privados | Crítico | Datos sensibles expuestos | [AUDIT_CURRENT_STATE.md](./docs/AUDIT_CURRENT_STATE.md) |
+| Nginx no funcional con Docker | Alto | No se puede desplegar vía Docker | [AUDIT_CURRENT_STATE.md](./docs/AUDIT_CURRENT_STATE.md) |
+| Importación CSV destructiva | Alto | Reimportación revierte encontrados | [DATA_SOURCES_STORAGE_AND_HOSTING.md](./docs/DATA_SOURCES_STORAGE_AND_HOSTING.md) |
+
+### Arquitectura actual frente a objetivo
+
+| Área | Arquitectura actual | Arquitectura objetivo | Brecha |
+|------|---------------------|----------------------|:------:|
+| Frontend | SPA vanilla JS monolítico | SPA modular con separación de responsabilidades | Media |
+| API | Edge Function + fallback directo a Supabase | Edge Function como única frontera | Alta |
+| Datos | Tabla única con SELECT público total | Vista pública + tabla base con acceso restringido | Alta |
+| Autenticación | Supabase Auth (email + contraseña) | Supabase Auth + roles (admin, moderador, visor) | Alta |
+| Autorización | verifyAdmin() sin verificación de rol | Verificación de rol real en cada endpoint | Crítica |
+| Storage | Bucket público sin restricciones | Bucket restringido con validación de tipo y tamaño | Media |
+| Auditoría | Sin historial de cambios | Tabla de auditoría con trigger automático | Alta |
+| Moderación | Sin moderación — publicación inmediata | Cola de moderación con aprobación admin | Alta |
+| Infraestructura | Docker con error HTTPS, sin CI/CD | Docker funcional + CI/CD + staging | Alta |
+| Testing | Sin pruebas automatizadas | Tests unitarios + integración mínimos | Alta |
+| Observabilidad | Sin monitoreo ni logs | Health checks + logging + alertas | Alta |
+| Backups | No documentado | Política de backup documentada y verificada | Media |
+
+> Para el plan detallado de transición, ver [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) y [docs/RECOMMENDED_BACKLOG.md](./docs/RECOMMENDED_BACKLOG.md).
+
+### Cómo modificar el sistema de forma segura
+
+> [!WARNING]
+> Un cambio en la API puede requerir actualizar también el camino de acceso directo y el sandbox mientras esos tres modos continúen coexistiendo.
+
+**Cambios de frontend**: revisar juntos `index.html`, `static/css/style.css` y `static/js/app.js`. Los selectores del JS referencian IDs y clases del HTML.
+
+**Cambios de API**: revisar `supabase/functions/api/index.ts` y `static/js/app.js` (sección de fallback). La lógica de validación debe mantenerse sincronizada entre ambos.
+
+**Cambios de datos**: revisar `schema.sql` (tabla, RLS, índices), la Edge Function (consultas SQL) y `app.js` (fallback directo e importador CSV).
+
+**Cambios de despliegue**: revisar `Dockerfile` (archivos copiados), `docker-compose.yml` (puertos, volúmenes) y `nginx.conf` (SSL, proxy, headers).
 
 ---
 
@@ -506,8 +905,15 @@ flowchart TD
 - **Familiar o ciudadano**: Leé [Cómo funciona](#cómo-funciona-para-una-persona-no-técnica) y [HOW_THE_PROJECT_WORKS.md](./docs/HOW_THE_PROJECT_WORKS.md).
 - **Voluntario**: Leé [Capacidades actuales](#capacidades-actuales) y [Origen de los datos](#origen-recorrido-y-destino-de-los-datos).
 - **Coordinador no técnico**: Leé [Entender el proyecto](#entender-el-proyecto-en-cinco-minutos) y [Calidad de datos](#calidad-y-confiabilidad-de-la-información).
-- **Desarrollador**: Leé [Arquitectura actual](#arquitectura-actual) y [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
-- **Administrador de sistema**: Leé [Despliegue](#despliegue) y [DATA_SOURCES_STORAGE_AND_HOSTING.md](./docs/DATA_SOURCES_STORAGE_AND_HOSTING.md).
+- **Frontend**: Leé [Mapa de código](#mapa-de-código), [Modos de operación](#modos-de-operación) y [Flujo de búsqueda](#flujo-técnico-de-una-consulta-de-búsqueda).
+- **Backend**: Leé [Edge Function](#modos-de-operación), [Autenticación y autorización](#autenticación-y-autorización) y [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+- **Datos**: Leé [Arquitectura de datos](#arquitectura-de-datos) y [DATA_SOURCES_STORAGE_AND_HOSTING.md](./docs/DATA_SOURCES_STORAGE_AND_HOSTING.md).
+- **Seguridad**: Leé [Fronteras de seguridad](#fronteras-de-seguridad-actuales) y [AUDIT_CURRENT_STATE.md](./docs/AUDIT_CURRENT_STATE.md).
+- **DevOps**: Leé [Arquitectura de despliegue](#arquitectura-de-despliegue) y [DATA_SOURCES_STORAGE_AND_HOSTING.md](./docs/DATA_SOURCES_STORAGE_AND_HOSTING.md).
+- **QA**: Leé [Modos de operación](#modos-de-operación) y [AUDIT_EXECUTION_LOG.md](./docs/AUDIT_EXECUTION_LOG.md).
+- **Arquitectura**: Leé [Decisiones y deuda técnica](#decisiones-arquitectónicas-y-deuda-técnica) y [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+- **Product Manager o Project Manager**: Leé [Arquitectura actual frente a objetivo](#arquitectura-actual-frente-a-objetivo) y [RECOMMENDED_BACKLOG.md](./docs/RECOMMENDED_BACKLOG.md).
+- **Administrador de sistema**: Leé [Despliegue](#despliegue) y [Arquitectura de despliegue](#arquitectura-de-despliegue).
 - **Auditor de seguridad**: Leé [Seguridad](#seguridad-y-privacidad) y [AUDIT_CURRENT_STATE.md](./docs/AUDIT_CURRENT_STATE.md).
 - **Colaborador de datos**: Leé [Calidad de datos](#calidad-y-confiabilidad-de-la-información).
 
