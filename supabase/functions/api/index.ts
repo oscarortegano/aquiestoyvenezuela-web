@@ -33,7 +33,7 @@ serve(async (req) => {
     if (!authHeader) {
       throw new Error("Missing authorization header");
     }
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
       throw new Error("Unauthorized admin user");
@@ -73,8 +73,8 @@ serve(async (req) => {
       const ordenFilter = url.searchParams.get("orden") || "recientes";
       const tipoUbicacionFilter = url.searchParams.get("tipoUbicacion") || "all";
       const ubicacionFilter = url.searchParams.get("ubicacion")?.trim() || "";
-      const offset = parseInt(url.searchParams.get("offset") || "0", 10);
-      const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 50);
+      const offset = Math.max(0, parseInt(url.searchParams.get("offset") || "0", 10) || 0);
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10) || 50, 50);
 
       let query = supabase.from("personas").select("*");
 
@@ -128,7 +128,7 @@ serve(async (req) => {
         query = query.order("edad", { ascending: false, nullsFirst: false });
       } else {
         query = query
-          .order("estado", { ascending: false })
+          .order("estado", { ascending: true })
           .order("fecha_registro", { ascending: false });
       }
 
@@ -145,9 +145,11 @@ serve(async (req) => {
 
     // 3. POST /personas (Creación pública de reporte)
     if (path === "/personas" && method === "POST") {
-      const body = await req.json();
-      
-      // Validación básica
+      let body: any;
+      try { body = await req.json(); } catch {
+        return new Response(JSON.stringify({ error: "Cuerpo JSON inválido." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       if (!body.nombre || !body.cedula) {
         return new Response(
           JSON.stringify({ error: "Nombre y Cédula son requeridos." }),
@@ -174,7 +176,7 @@ serve(async (req) => {
       if (error) throw error;
 
       return new Response(
-        JSON.stringify(data[0]),
+        JSON.stringify(data?.[0] ?? null),
         { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -184,7 +186,10 @@ serve(async (req) => {
     if (statusMatch && method === "PUT") {
       await verifyAdmin();
       const id = statusMatch[1];
-      const body = await req.json();
+      let body: any;
+      try { body = await req.json(); } catch {
+        return new Response(JSON.stringify({ error: "Cuerpo JSON inválido." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
       if (!body.estado) {
         return new Response(
@@ -208,7 +213,7 @@ serve(async (req) => {
       if (error) throw error;
 
       return new Response(
-        JSON.stringify(data[0]),
+        JSON.stringify(data?.[0] ?? null),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -235,8 +240,11 @@ serve(async (req) => {
     // 5. POST /import-csv (Privado - Carga Masiva)
     if (path === "/import-csv" && method === "POST") {
       await verifyAdmin();
-      const body = await req.json(); // Array de registros parsed
-      
+      let body: any;
+      try { body = await req.json(); } catch {
+        return new Response(JSON.stringify({ error: "Cuerpo JSON inválido." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       if (!Array.isArray(body)) {
         return new Response(
           JSON.stringify({ error: "El cuerpo debe ser un array de registros." }),
@@ -267,11 +275,13 @@ serve(async (req) => {
         );
       }
 
-      const { error } = await supabase
-        .from("personas")
-        .upsert(validRows, { onConflict: "cedula" });
-
-      if (error) throw error;
+      const CHUNK = 500;
+      for (let i = 0; i < validRows.length; i += CHUNK) {
+        const { error } = await supabase
+          .from("personas")
+          .upsert(validRows.slice(i, i + CHUNK), { onConflict: "cedula" });
+        if (error) throw error;
+      }
 
       return new Response(
         JSON.stringify({ message: "Importación completada", inserted: validRows.length, skipped }),
