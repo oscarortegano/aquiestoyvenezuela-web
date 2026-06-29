@@ -12,11 +12,12 @@ const state = {
     tipoUbicacionFilter: 'all', // Tipo: 'all', 'hospital', 'refugio'
     ubicacionFilter: '',     // Filtro de ubicación: texto libre
     
-    // Estado de Paginación
-    pageSize: 50,           // Cantidad de registros por lote
-    offset: 0,              // Desplazamiento actual para la consulta
-    hasMore: false,         // Indica si hay más registros en el servidor
-    isLoading: false        // Bloqueo para evitar consultas dobles
+    viewMode: 'grid',       // 'grid' | 'list'
+    currentPage: 1,
+    pageSize: 12,
+    offset: 0,
+    hasMore: false,
+    isLoading: false
 };
 
 // Cargar número de WhatsApp alternativo si se define en config.js
@@ -40,8 +41,10 @@ const DOM = {
     btnAdminLogout: document.getElementById('btn-admin-logout'),
     adminIndicator: document.getElementById('admin-indicator'),
     adminPanel: document.getElementById('admin-panel'),
-    loadMoreContainer: document.getElementById('load-more-container'),
-    btnLoadMore: document.getElementById('btn-load-more'),
+    paginationContainer: document.getElementById('pagination-container'),
+    viewToggleContainer: document.getElementById('view-toggle-container'),
+    btnViewGrid: document.getElementById('btn-view-grid'),
+    btnViewList: document.getElementById('btn-view-list'),
     
     // Stats
     statTotal: document.getElementById('stat-total'),
@@ -183,15 +186,16 @@ function setupSandboxMode() {
         background: linear-gradient(90deg, #2563eb, #1d4ed8);
         color: white;
         text-align: center;
-        padding: 0.5rem 1rem;
+        padding: 0.5rem 3rem 0.5rem 1rem;
         font-size: 0.85rem;
         font-weight: 600;
         z-index: 2000;
         box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     `;
     banner.innerHTML = `
-        🚀 Modo Demostración Local (Sandbox). Los datos se guardan en este navegador. 
+        🚀 Modo Demostración Local (Sandbox). Los datos se guardan en este navegador.
         Para producción, conecta tu base de datos de Supabase en <code style="background:rgba(0,0,0,0.2); padding:2px 6px; border-radius:4px;">static/js/config.js</code>.
+        <button onclick="this.closest('div').remove(); document.body.style.paddingTop=''" style="position:absolute; right:0.75rem; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.35); border:2px solid rgba(255,255,255,0.6); color:white; width:28px; height:28px; border-radius:6px; cursor:pointer; font-size:1rem; font-weight:700; line-height:1; display:flex; align-items:center; justify-content:center;" aria-label="Cerrar">✕</button>
     `;
     document.body.prepend(banner);
     document.body.style.paddingTop = '2.5rem';
@@ -200,14 +204,38 @@ function setupSandboxMode() {
     const sessionActive = sessionStorage.getItem('admin_session_demo') === 'active';
     setAdminState(sessionActive);
     
-    // Inicializar datos semilla ficticios si la memoria local esta vacia.
-    if (!localStorage.getItem('personas_demo')) {
+    // Inicializar (o actualizar) datos semilla si no existen o son los placeholders viejos
+    const _existingDemo = JSON.parse(localStorage.getItem('personas_demo') || '[]');
+    const _isOldDemo = _existingDemo.length === 0 || _existingDemo.some(p => p.cedula && p.cedula.startsWith('V-0000000'));
+    if (_isOldDemo) {
+        const now = Date.now();
+        const h = 3600000;
         const seedData = [
-            { id: 1, nombre: "Persona Demo 001", cedula: "V-00000001", edad: 34, ultima_ubicacion: "Ubicacion demo", telefono_contacto: "0000-0000000", observaciones: "Registro ficticio para pruebas locales.", estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(Date.now() - 3600000 * 2).toISOString() },
-            { id: 2, nombre: "Persona Demo 002", cedula: "V-00000002", edad: 28, ultima_ubicacion: "Ubicacion demo", telefono_contacto: "0000-0000000", observaciones: "Registro ficticio para pruebas locales.", estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(Date.now() - 3600000 * 5).toISOString() },
-            { id: 3, nombre: "Persona Demo 003", cedula: "V-00000003", edad: 62, ultima_ubicacion: "Ubicacion demo", telefono_contacto: "0000-0000000", observaciones: "Registro ficticio para pruebas locales.", estado: "Encontrado", ubicacion_encontrado: "Ubicacion demo", encontrado_por: "Usuario Demo", encontrado_por_cedula: "V-00000004", es_menor: false, foto_url: null, fecha_registro: new Date(Date.now() - 3600000 * 24).toISOString() },
-            { id: 4, nombre: "Persona Demo 004", cedula: "V-00000005", edad: 45, ultima_ubicacion: "Ubicacion demo", telefono_contacto: "0000-0000000", observaciones: "Registro ficticio para pruebas locales.", estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(Date.now() - 3600000 * 48).toISOString() },
-            { id: 5, nombre: "Persona Demo 005", cedula: "V-00000006", edad: 10, ultima_ubicacion: "Ubicacion demo", telefono_contacto: "0000-0000000", observaciones: "Registro ficticio para pruebas locales.", estado: "Desaparecido", es_menor: true, foto_url: null, fecha_registro: new Date(Date.now() - 3600000 * 12).toISOString() }
+            { id: 1,  nombre: "María Alejandra Rodríguez Pérez",   cedula: "V-12345678",  edad: 34, ultima_ubicacion: "Av. Urdaneta, La Candelaria, Caracas",              telefono_contacto: "0412-5551234", observaciones: "Vestía pantalón azul y camisa blanca. Cicatriz en mano derecha.",               estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 2).toISOString() },
+            { id: 2,  nombre: "José Antonio González Herrera",      cedula: "V-8765432",   edad: 52, ultima_ubicacion: "Mercado Las Pulgas, Maracaibo",                       telefono_contacto: "0414-7772345", observaciones: "Usa gafas, cabello canoso. Padece diabetes.",                                  estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 5).toISOString() },
+            { id: 3,  nombre: "Carmen Elena Blanco Suárez",         cedula: "V-20111333",  edad: 28, ultima_ubicacion: "Terminal de Pasajeros, Valencia",                    telefono_contacto: null,           observaciones: null,                                                                         estado: "Encontrado",  es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 24).toISOString(), ubicacion_encontrado: "Hospital Central de Valencia, Emergencias",    encontrado_por: "Pedro Blanco",              encontrado_por_cedula: "V-15444222" },
+            { id: 4,  nombre: "Luisa Fernanda Cabrera López",       cedula: "V-25678901",  edad: 10, ultima_ubicacion: "Urb. La Isabelica, Valencia",                        telefono_contacto: "0416-3330987", observaciones: "Lleva mochila azul con dinosaurios. Cabello largo trenzado.",                 estado: "Desaparecido", es_menor: true,  foto_url: null, fecha_registro: new Date(now - h * 8).toISOString() },
+            { id: 5,  nombre: "Carlos Alberto Jiménez Mora",        cedula: "V-6543210",   edad: 67, ultima_ubicacion: "Casco Central de Barquisimeto, Lara",                 telefono_contacto: "0212-5559876", observaciones: "Adulto mayor, usa bastón. Tiene marcapasos.",                                  estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 48).toISOString() },
+            { id: 6,  nombre: "Valentina Beatriz Soto Fuentes",     cedula: "V-28901234",  edad: 22, ultima_ubicacion: "Universidad Central de Venezuela, Caracas",           telefono_contacto: "0424-1114567", observaciones: null,                                                                         estado: "Encontrado",  es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 12).toISOString(), ubicacion_encontrado: "Refugio Polideportivo de Chacao",              encontrado_por: "Andreína Torres",           encontrado_por_cedula: "V-24333111" },
+            { id: 7,  nombre: "Rafael Andrés Hernández Castro",     cedula: "V-15678234",  edad: 45, ultima_ubicacion: "Petare Norte, Caracas",                               telefono_contacto: null,           observaciones: "Tatuaje en brazo izquierdo. Trabaja en construcción.",                      estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 6).toISOString() },
+            { id: 8,  nombre: "Gabriela Isabel Romero Vargas",      cedula: "V-19234567",  edad: 15, ultima_ubicacion: "Liceo Andrés Bello, El Paraíso, Caracas",             telefono_contacto: "0412-8889012", observaciones: "Uniforme escolar, audífonos blancos.",                                       estado: "Desaparecido", es_menor: true,  foto_url: null, fecha_registro: new Date(now - h * 3).toISOString() },
+            { id: 9,  nombre: "Miguel Ángel Carpio Benítez",        cedula: "E-84567890",  edad: 38, ultima_ubicacion: "Zona Industrial, San Cristóbal, Táchira",             telefono_contacto: "0276-5554321", observaciones: "Ciudadano colombiano. Trabajador metalúrgico, casco amarillo.",                estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 72).toISOString() },
+            { id: 10, nombre: "Rosa Marina Delgado Espinoza",       cedula: "V-9876543",   edad: 71, ultima_ubicacion: "Barrio El Carmen, Cumaná, Sucre",                     telefono_contacto: "0416-6667890", observaciones: "Adulta mayor con Alzheimer. Posiblemente desorientada.",                     estado: "Encontrado",  es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 36).toISOString(), ubicacion_encontrado: "Hospital Antonio Patricio de Alcalá, Cumaná",  encontrado_por: "Cruz Roja Venezolana",      encontrado_por_cedula: "V-11223344" },
+            { id: 11, nombre: "Alejandro José Peña Quintero",       cedula: "V-22334455",  edad: 31, ultima_ubicacion: "Av. Bolívar, Puerto La Cruz, Anzoátegui",             telefono_contacto: null,           observaciones: null,                                                                         estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 18).toISOString() },
+            { id: 12, nombre: "Daniela Cristina Núñez Salazar",     cedula: "V-26789012",  edad: 26, ultima_ubicacion: "Centro Comercial Sambil, Caracas",                    telefono_contacto: "0424-2223456", observaciones: "Cabello rojo, vestido floreado. Aprox. 1.70m.",                               estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 4).toISOString() },
+            { id: 13, nombre: "Fernando Luis Aguilar Reyes",        cedula: "V-17890123",  edad: 58, ultima_ubicacion: "Sector El Ujano, Mérida",                             telefono_contacto: "0274-5558901", observaciones: "Campesino. Vestía ropa de trabajo con bota de caucho.",                     estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 96).toISOString() },
+            { id: 14, nombre: "Mariela Josefina Colmenares Vega",   cedula: "V-23456789",  edad: 42, ultima_ubicacion: "Boleíta Norte, Caracas",                              telefono_contacto: "0212-4443210", observaciones: "Enfermera. Posiblemente cerca del edificio colapsado.",                       estado: "Encontrado",  es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 15).toISOString(), ubicacion_encontrado: "Clínica El Ávila, Altamira, Caracas",          encontrado_por: "Bomberos Metropolitanos",    encontrado_por_cedula: "V-99887766" },
+            { id: 15, nombre: "Diego Ramón Briceño Contreras",      cedula: "V-13579246",  edad: 8,  ultima_ubicacion: "Escuela Básica Simón Bolívar, El Valle, Caracas",     telefono_contacto: "0412-1116789", observaciones: "Niño. Mochila roja. Estaba en clases al momento del sismo.",                 estado: "Desaparecido", es_menor: true,  foto_url: null, fecha_registro: new Date(now - h * 1).toISOString() },
+            { id: 16, nombre: "Estefanía Paola Leal Matos",         cedula: "V-29012345",  edad: 24, ultima_ubicacion: "Los Teques, Miranda",                                 telefono_contacto: "0416-9998765", observaciones: null,                                                                         estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 9).toISOString() },
+            { id: 17, nombre: "Wilmer Antonio Useche Pacheco",      cedula: "V-11357924",  edad: 35, ultima_ubicacion: "Av. Intercomunal, Guarenas, Miranda",                  telefono_contacto: null,           observaciones: "Conductor de camión. Llevaba carga hacia Caracas.",                         estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 55).toISOString() },
+            { id: 18, nombre: "Grecia Margarita Blanco Arteaga",    cedula: "V-24680135",  edad: 62, ultima_ubicacion: "Porlamar, Isla de Margarita, Nueva Esparta",           telefono_contacto: "0295-4445678", observaciones: "Prótesis en rodilla derecha. Necesita medicación para la tensión.",         estado: "Encontrado",  es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 40).toISOString(), ubicacion_encontrado: "Hospital Luis Ortega, Porlamar",               encontrado_por: "Defensa Civil Nueva Esparta", encontrado_por_cedula: "V-33221100" },
+            { id: 19, nombre: "Freddy José Montoya Acosta",         cedula: "V-7654321",   edad: 49, ultima_ubicacion: "El Hatillo, Miranda",                                 telefono_contacto: "0424-5556789", observaciones: null,                                                                         estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 20).toISOString() },
+            { id: 20, nombre: "Nathaly Carolina Dugarte Colina",    cedula: "V-27654321",  edad: 19, ultima_ubicacion: "Plaza Venezuela, Caracas",                             telefono_contacto: "0412-7773456", observaciones: "Cabello negro hasta los hombros, aretes largos dorados.",                   estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 7).toISOString() },
+            { id: 21, nombre: "Roberto Carlos Figueroa Pinto",      cedula: "E-65432109",  edad: 44, ultima_ubicacion: "Sector Las Mayas, Caracas",                           telefono_contacto: null,           observaciones: "Ciudadano peruano. Trabaja en restaurante.",                                  estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 30).toISOString() },
+            { id: 22, nombre: "Yurimar del Valle Aponte Medina",    cedula: "V-18765432",  edad: 39, ultima_ubicacion: "Barquisimeto, Lara",                                  telefono_contacto: "0251-3339012", observaciones: "Maestra de primaria. Posiblemente en la escuela.",                           estado: "Encontrado",  es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 22).toISOString(), ubicacion_encontrado: "Ambulatorio Dr. Luis Razetti, Barquisimeto",   encontrado_por: "Protección Civil Lara",     encontrado_por_cedula: "V-55667788" },
+            { id: 23, nombre: "Ana Sofía Torres Mendoza",           cedula: "V-30123456",  edad: 17, ultima_ubicacion: "Maiquetía, La Guaira",                                telefono_contacto: "0424-8881234", observaciones: "Estaba en el aeropuerto esperando vuelo de familiar.",                      estado: "Desaparecido", es_menor: true,  foto_url: null, fecha_registro: new Date(now - h * 11).toISOString() },
+            { id: 24, nombre: "Pedro Enrique Velásquez Ramos",      cedula: "V-5432109",   edad: 78, ultima_ubicacion: "San Bernardino, Caracas",                             telefono_contacto: "0212-6665432", observaciones: "Adulto mayor. Camina con dificultad. Audífono en oído derecho.",             estado: "Desaparecido", es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 60).toISOString() },
+            { id: 25, nombre: "Luis Eduardo Martínez Díaz",         cedula: "V-16543210",  edad: 33, ultima_ubicacion: "El Rosal, Chacao, Caracas",                           telefono_contacto: "0416-4447890", observaciones: null,                                                                         estado: "Encontrado",  es_menor: false, foto_url: null, fecha_registro: new Date(now - h * 16).toISOString(), ubicacion_encontrado: "Centro Médico Docente La Trinidad",            encontrado_por: "María Martínez (hermana)", encontrado_por_cedula: "V-20543210" }
         ];
         localStorage.setItem('personas_demo', JSON.stringify(seedData));
     }
@@ -260,34 +288,14 @@ async function loadStats() {
 
 // --- CONSULTA PAGINADA Y FILTRADA DESDE LA BASE DE DATOS ---
 
-async function fetchRecords(append = false) {
+async function fetchRecords() {
     if (state.isLoading) return;
     state.isLoading = true;
-    
-    // Actualizar UI del botón de carga
-    DOM.btnLoadMore.disabled = true;
-    DOM.btnLoadMore.innerHTML = `
-        <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem; animation: rotate 1s linear infinite;">
-            <line x1="12" y1="2" x2="12" y2="6"></line>
-            <line x1="12" y1="18" x2="12" y2="22"></line>
-            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
-            <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
-            <line x1="2" y1="12" x2="6" y2="12"></line>
-            <line x1="18" y1="12" x2="22" y2="12"></line>
-            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
-            <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-        </svg>
-        Cargando registros...
-    `;
 
     DOM.filtersBar.style.display = 'flex';
+    DOM.cardsGrid.classList.add('is-loading');
 
-    if (!append) {
-        renderSkeletons();
-        state.offset = 0;
-    } else {
-        state.offset += state.pageSize;
-    }
+    state.offset = (state.currentPage - 1) * state.pageSize;
 
     const searchQuery = DOM.searchInput.value.trim().toLowerCase();
     let fetchedData = [];
@@ -484,80 +492,30 @@ async function fetchRecords(append = false) {
             }
         }
 
-        // 2. Actualizar estado e interfaz
-        if (!append) {
-            state.personas = fetchedData;
-        } else {
-            state.personas = state.personas.concat(fetchedData);
-        }
-
+        state.personas = fetchedData;
         state.hasMore = hasMoreRecords;
-        renderPersonas(append);
-        
+        renderPersonas();
+
     } catch (err) {
         console.error('Error al realizar fetch de registros:', err);
         showToast('Error al consultar el directorio.', 'error');
     } finally {
         state.isLoading = false;
-        // Restaurar estado del botón de carga
-        DOM.btnLoadMore.disabled = false;
-        DOM.btnLoadMore.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem;">
-                <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-            Cargar más personas...
-        `;
+        DOM.cardsGrid.classList.remove('is-loading');
     }
 }
 
 // --- RENDERIZADO DE LA INTERFAZ ---
 
-function renderSkeletons() {
-    DOM.cardsGrid.innerHTML = '';
-    for (let i = 0; i < 6; i++) {
-        const card = document.createElement('div');
-        card.className = 'person-card skeleton';
-        card.innerHTML = `
-            <div>
-                <div class="card-header-wrapper">
-                    <div class="skeleton-line skeleton-avatar"></div>
-                    <div class="card-header-details">
-                        <div class="skeleton-line skeleton-title"></div>
-                        <div class="skeleton-line skeleton-badge"></div>
-                    </div>
-                </div>
-                <div class="card-body" style="margin-top:0.75rem;">
-                    <div class="skeleton-line skeleton-row"></div>
-                    <div class="skeleton-line skeleton-row" style="width:80%;"></div>
-                    <div class="skeleton-line skeleton-row" style="width:60%;"></div>
-                </div>
-            </div>
-            <div class="card-footer">
-                <div class="skeleton-line skeleton-row" style="width:40%; margin-left:auto;"></div>
-            </div>`;
-        DOM.cardsGrid.appendChild(card);
-    }
-}
-
-function renderPersonas(append = false) {
+function renderPersonas() {
     const searchQuery = DOM.searchInput.value.trim();
 
-    // 1. Mostrar/Ocultar controles de paginación e información
-    if (state.hasMore) {
-        DOM.loadMoreContainer.style.display = 'block';
-    } else {
-        DOM.loadMoreContainer.style.display = 'none';
-    }
+    DOM.cardsGrid.innerHTML = '';
 
-    // Si no cargamos por "Cargar más", limpiamos la grilla
-    if (!append) {
-        DOM.cardsGrid.innerHTML = '';
-    }
-
-    // 2. Si no hay registros
     if (state.personas.length === 0) {
-        DOM.loadMoreContainer.style.display = 'none';
-        
+        if (DOM.viewToggleContainer) DOM.viewToggleContainer.style.display = 'none';
+        if (DOM.paginationContainer) DOM.paginationContainer.style.display = 'none';
+
         if (searchQuery) {
             renderEmptySearchState(searchQuery);
         } else {
@@ -571,10 +529,25 @@ function renderPersonas(append = false) {
         return;
     }
 
-    // 3. Renderizar las tarjetas de personas en el grid
-    // Si estamos haciendo append, solo renderizamos los nuevos (los últimos N)
-    const listToRender = append ? state.personas.slice(state.personas.length - state.pageSize) : state.personas;
-    renderCards(listToRender);
+    if (DOM.viewToggleContainer) {
+        DOM.viewToggleContainer.style.display = 'flex';
+        const countEl = document.getElementById('view-toggle-count');
+        if (countEl) {
+            const n = state.personas.length;
+            const suffix = state.hasMore ? '+' : '';
+            countEl.textContent = `${n}${suffix} persona${n !== 1 ? 's' : ''}`;
+        }
+    }
+
+    if (state.viewMode === 'list') {
+        DOM.cardsGrid.classList.add('cards-grid--list');
+        renderList(state.personas);
+    } else {
+        DOM.cardsGrid.classList.remove('cards-grid--list');
+        renderCards(state.personas);
+    }
+
+    renderPagination();
 }
 
 function renderCards(list) {
@@ -687,6 +660,108 @@ function renderCards(list) {
         cardHTML += `</div>`;
         card.innerHTML = cardHTML;
         DOM.cardsGrid.appendChild(card);
+    });
+}
+
+function renderList(list) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'list-view-wrapper';
+
+    const table = document.createElement('table');
+    table.className = 'list-view';
+
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th class="list-th">Nombre</th>
+                <th class="list-th">Cédula</th>
+                <th class="list-th list-th--hide-sm">Edad</th>
+                <th class="list-th list-th--hide-sm">Última Ubicación</th>
+                <th class="list-th">Estado</th>
+                <th class="list-th list-th--hide-md">Registrado</th>
+                ${state.isAdmin ? '<th class="list-th">Acciones</th>' : ''}
+            </tr>
+        </thead>
+        <tbody id="list-tbody"></tbody>
+    `;
+
+    const tbody = table.querySelector('#list-tbody');
+
+    list.forEach(person => {
+        const isMissing = person.estado === 'Desaparecido';
+        const badgeClass = isMissing ? 'missing' : 'found';
+        const fecha = new Date(person.fecha_registro).toLocaleDateString('es-VE', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+
+        const tr = document.createElement('tr');
+        tr.className = 'list-row';
+        tr.style.cursor = 'pointer';
+        tr.onclick = () => window.openDetailsModal(person.id);
+
+        let adminCells = '';
+        if (state.isAdmin) {
+            adminCells = `
+                <td class="list-cell list-actions" onclick="event.stopPropagation()">
+                    <button class="btn btn-admin-edit btn-sm" onclick="window.openStatusModal(${person.id}, '${escapeJS(person.nombre)}', '${person.estado}', '${escapeJS(person.ubicacion_encontrado || '')}', '${escapeJS(person.encontrado_por || '')}', '${escapeJS(person.encontrado_por_cedula || '')}')">Actualizar</button>
+                    <button class="btn btn-admin-delete btn-sm" onclick="handleDeletePerson(${person.id}, '${escapeJS(person.nombre)}')">Eliminar</button>
+                </td>
+            `;
+        }
+
+        tr.innerHTML = `
+            <td class="list-cell list-name">
+                <span class="list-person-name">${escapeHTML(person.nombre)}</span>
+                ${person.es_menor ? '<span class="status-badge minor" style="font-size:0.65rem;">Menor</span>' : ''}
+            </td>
+            <td class="list-cell">${escapeHTML(person.cedula)}</td>
+            <td class="list-cell list-th--hide-sm">${person.edad ? person.edad + ' años' : '—'}</td>
+            <td class="list-cell list-th--hide-sm">${person.ultima_ubicacion ? escapeHTML(person.ultima_ubicacion) : '—'}</td>
+            <td class="list-cell"><span class="status-badge ${badgeClass}">${escapeHTML(person.estado)}</span></td>
+            <td class="list-cell list-th--hide-md">${fecha}</td>
+            ${adminCells}
+        `;
+
+        tbody.appendChild(tr);
+    });
+
+    wrapper.appendChild(table);
+    DOM.cardsGrid.appendChild(wrapper);
+}
+
+function renderPagination() {
+    if (!DOM.paginationContainer) return;
+
+    const totalPages = Math.ceil((state.hasMore ? state.currentPage * state.pageSize + 1 : state.currentPage * state.pageSize) / state.pageSize);
+    const hasNext = state.hasMore;
+    const hasPrev = state.currentPage > 1;
+
+    if (!hasNext && !hasPrev) {
+        DOM.paginationContainer.style.display = 'none';
+        return;
+    }
+
+    DOM.paginationContainer.style.display = 'flex';
+    DOM.paginationContainer.innerHTML = `
+        <button class="btn-page" id="btn-prev-page" ${!hasPrev ? 'disabled' : ''}>← Anterior</button>
+        <span class="page-indicator">Página ${state.currentPage}</span>
+        <button class="btn-page" id="btn-next-page" ${!hasNext ? 'disabled' : ''}>Siguiente →</button>
+    `;
+
+    document.getElementById('btn-prev-page')?.addEventListener('click', () => {
+        if (state.currentPage > 1) {
+            state.currentPage--;
+            fetchRecords();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+
+    document.getElementById('btn-next-page')?.addEventListener('click', () => {
+        if (state.hasMore) {
+            state.currentPage++;
+            fetchRecords();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     });
 }
 
@@ -865,6 +940,11 @@ async function handleInlineReportSubmit(e) {
 
 // --- GESTIÓN DE EVENTOS (LISTENERS) ---
 
+function resetAndFetch() {
+    state.currentPage = 1;
+    fetchRecords();
+}
+
 function setupEventListeners() {
     // Auto-formato de cédula con puntos
     attachCedulaFormatter('report-cedula');
@@ -883,15 +963,15 @@ function setupEventListeners() {
 
     // Ejecutar búsqueda al pulsar el botón Buscar
     DOM.btnRunSearch.addEventListener('click', () => {
-        state.showingFullList = false; // La búsqueda apaga el modo directorio completo
-        fetchRecords(false);
+        state.showingFullList = false;
+        resetAndFetch();
     });
 
     // Ejecutar búsqueda al pulsar Enter
     DOM.searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             state.showingFullList = false;
-            fetchRecords(false);
+            resetAndFetch();
         }
     });
 
@@ -900,15 +980,14 @@ function setupEventListeners() {
         chip.addEventListener('click', () => {
             document.querySelectorAll('#category-filters .filter-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
-            
+
             const radioInput = chip.querySelector('input[type="radio"]');
             if (radioInput) {
                 radioInput.checked = true;
                 state.searchCategory = radioInput.value;
-                
-                // Solo recargamos si hay texto o estamos viendo la lista completa
+
                 if (DOM.searchInput.value.trim() || state.showingFullList) {
-                    fetchRecords(false);
+                    resetAndFetch();
                 }
             }
         });
@@ -919,14 +998,14 @@ function setupEventListeners() {
         chip.addEventListener('click', () => {
             document.querySelectorAll('#status-filters .filter-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
-            
+
             const radioInput = chip.querySelector('input[type="radio"]');
             if (radioInput) {
                 radioInput.checked = true;
                 state.statusFilter = radioInput.value;
-                
+
                 if (DOM.searchInput.value.trim() || state.showingFullList) {
-                    fetchRecords(false);
+                    resetAndFetch();
                 }
             }
         });
@@ -935,14 +1014,14 @@ function setupEventListeners() {
     // Filtro de edad (select)
     DOM.filterEdad.addEventListener('change', () => {
         state.edadFilter = DOM.filterEdad.value;
-        fetchRecords(false);
+        resetAndFetch();
     });
 
     // Filtro de orden (select)
     if (DOM.filterOrden) {
         DOM.filterOrden.addEventListener('change', () => {
             state.ordenFilter = DOM.filterOrden.value;
-            fetchRecords(false);
+            resetAndFetch();
         });
     }
 
@@ -950,7 +1029,7 @@ function setupEventListeners() {
     if (DOM.filterTipoUbicacion) {
         DOM.filterTipoUbicacion.addEventListener('change', () => {
             state.tipoUbicacionFilter = DOM.filterTipoUbicacion.value;
-            fetchRecords(false);
+            resetAndFetch();
         });
     }
 
@@ -958,24 +1037,33 @@ function setupEventListeners() {
     DOM.filterUbicacion.addEventListener('input', () => {
         state.ubicacionFilter = DOM.filterUbicacion.value.trim();
         clearTimeout(ubicacionDebounceTimer);
-        ubicacionDebounceTimer = setTimeout(() => fetchRecords(false), 400);
+        ubicacionDebounceTimer = setTimeout(() => resetAndFetch(), 400);
     });
 
     // Alternar visualización del listado completo
     DOM.btnToggleList.addEventListener('click', () => {
         state.showingFullList = !state.showingFullList;
         if (state.showingFullList) {
-            DOM.searchInput.value = ''; // Limpiar buscador al abrir directorio
+            DOM.searchInput.value = '';
             DOM.searchBtnContainer.style.display = 'none';
-            fetchRecords(false);
+            resetAndFetch();
         } else {
             triggerSearchOrListReset();
         }
     });
 
-    // Botón de Paginación "Cargar más"
-    DOM.btnLoadMore.addEventListener('click', () => {
-        fetchRecords(true); // Cargar siguiente bloque añadiéndolo a la lista
+    // Toggles de vista (grid / lista)
+    DOM.btnViewGrid?.addEventListener('click', () => {
+        state.viewMode = 'grid';
+        DOM.btnViewGrid.classList.add('active');
+        DOM.btnViewList?.classList.remove('active');
+        renderPersonas();
+    });
+    DOM.btnViewList?.addEventListener('click', () => {
+        state.viewMode = 'list';
+        DOM.btnViewList.classList.add('active');
+        DOM.btnViewGrid?.classList.remove('active');
+        renderPersonas();
     });
     
     // Modales
@@ -1016,7 +1104,40 @@ function setupEventListeners() {
     DOM.formUpdateStatus.addEventListener('submit', handleStatusSubmit);
     
     DOM.btnImportCsv.addEventListener('click', handleCsvImport);
-    
+
+    // --- MENÚ DE NAVEGACIÓN ---
+    const navHamburger = document.getElementById('nav-hamburger');
+    const navLinksList = document.getElementById('nav-links');
+
+    if (navHamburger && navLinksList) {
+        navHamburger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = navLinksList.classList.contains('nav-links--open');
+            navLinksList.classList.toggle('nav-links--open');
+            navHamburger.classList.toggle('hamburger--open');
+            navHamburger.setAttribute('aria-expanded', String(!isOpen));
+        });
+
+        navLinksList.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                navLinksList.classList.remove('nav-links--open');
+                navHamburger.classList.remove('hamburger--open');
+                navHamburger.setAttribute('aria-expanded', 'false');
+            });
+        });
+    }
+
+    document.getElementById('nav-link-buscar')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        DOM.searchInput.focus();
+        DOM.searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    document.getElementById('nav-link-reportar')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleModal(DOM.modalReport, true);
+    });
+
     window.addEventListener('click', (e) => {
         if (e.target.classList.contains('modal-overlay')) {
             toggleModal(e.target, false);
@@ -1027,9 +1148,11 @@ function setupEventListeners() {
 // Resetea la vista si limpian el buscador o colapsan el listado
 function triggerSearchOrListReset() {
     if (!state.showingFullList) {
+        state.currentPage = 1;
         DOM.filtersBar.style.display = 'none';
         DOM.cardsGrid.innerHTML = '';
-        DOM.loadMoreContainer.style.display = 'none';
+        if (DOM.paginationContainer) DOM.paginationContainer.style.display = 'none';
+        if (DOM.viewToggleContainer) DOM.viewToggleContainer.style.display = 'none';
         DOM.toggleListContainer.style.display = 'block';
         
         // Resetear valores de filtros avanzados
@@ -1053,7 +1176,7 @@ function triggerSearchOrListReset() {
             Ver Lista de Desaparecidos y Localizados
         `;
     } else {
-        fetchRecords(false);
+        resetAndFetch();
     }
 }
 
@@ -1108,7 +1231,7 @@ async function handleReportSubmit(e) {
             
             // Recargar estadísticas y refrescar vista
             loadStats();
-            fetchRecords(false);
+            resetAndFetch();
             
         } else {
             try {
@@ -1183,7 +1306,7 @@ async function handleReportSubmit(e) {
             toggleModal(DOM.modalReport, false);
             
             await loadStats();
-            await fetchRecords(false);
+            await resetAndFetch();
         }
     } catch (err) {
         console.error('Error al registrar persona:', err);
@@ -1209,7 +1332,7 @@ async function handleLoginSubmit(e) {
             toggleModal(DOM.modalLogin, false);
             
             if (DOM.searchInput.value.trim() || state.showingFullList) {
-                fetchRecords(false);
+                resetAndFetch();
             }
         } else {
             showToast('Credenciales incorrectas para el modo local.', 'error');
@@ -1227,7 +1350,7 @@ async function handleLoginSubmit(e) {
                 await loadStats();
                 
                 if (DOM.searchInput.value.trim() || state.showingFullList) {
-                    await fetchRecords(false);
+                    await resetAndFetch();
                 }
             }
         } catch (err) {
@@ -1244,7 +1367,7 @@ async function handleLogout() {
         showToast('Sesión administrativa de demostración cerrada.', 'success');
         
         if (DOM.searchInput.value.trim() || state.showingFullList) {
-            fetchRecords(false);
+            resetAndFetch();
         }
     } else {
         try {
@@ -1255,7 +1378,7 @@ async function handleLogout() {
                 await loadStats();
                 
                 if (DOM.searchInput.value.trim() || state.showingFullList) {
-                    await fetchRecords(false);
+                    await resetAndFetch();
                 }
             }
         } catch (err) {
@@ -1299,7 +1422,7 @@ async function handleStatusSubmit(e) {
             toggleModal(DOM.modalStatus, false);
             
             await loadStats();
-            await fetchRecords(false);
+            await resetAndFetch();
         } else {
             const { data: { session } } = await supabaseClient.auth.getSession();
             const token = session?.access_token;
@@ -1336,7 +1459,7 @@ async function handleStatusSubmit(e) {
             toggleModal(DOM.modalStatus, false);
             
             await loadStats();
-            await fetchRecords(false);
+            await resetAndFetch();
         }
     } catch (err) {
         console.error('Error al actualizar estado:', err);
@@ -1357,7 +1480,7 @@ async function handleDeletePerson(id, nombre) {
             showToast('Registro eliminado.', 'success');
             
             await loadStats();
-            await fetchRecords(false);
+            await resetAndFetch();
         } else {
             const { data: { session } } = await supabaseClient.auth.getSession();
             const token = session?.access_token;
@@ -1382,7 +1505,7 @@ async function handleDeletePerson(id, nombre) {
             showToast('Registro eliminado con éxito.', 'success');
             
             await loadStats();
-            await fetchRecords(false);
+            await resetAndFetch();
         }
     } catch (err) {
         console.error('Error al eliminar persona:', err);
@@ -1494,7 +1617,7 @@ function handleCsvImport() {
                     DOM.csvFile.value = '';
                     
                     await loadStats();
-                    await fetchRecords(false);
+                    await resetAndFetch();
                 } else {
                     const { data: { session } } = await supabaseClient.auth.getSession();
                     const token = session?.access_token;
@@ -1527,7 +1650,7 @@ function handleCsvImport() {
                     DOM.csvFile.value = '';
                     
                     await loadStats();
-                    await fetchRecords(false);
+                    await resetAndFetch();
                 }
             } catch (err) {
                 console.error('Error en bulk insert:', err);

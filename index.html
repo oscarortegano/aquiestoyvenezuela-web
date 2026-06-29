@@ -9,6 +9,25 @@
 </head>
 <body>
 
+    <!-- Navigation -->
+    <nav class="main-nav" id="main-nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-brand">
+                <img src="static/img/logo.png" alt="Aquí Estoy Venezuela" class="nav-logo-img">
+            </a>
+            <ul class="nav-links" id="nav-links">
+                <li><a href="/" class="nav-link">Inicio</a></li>
+                <li><a href="#" class="nav-link" id="nav-link-buscar">Buscar personas</a></li>
+                <li><a href="#" class="nav-link nav-link--cta" id="nav-link-reportar">Reportar desaparecido</a></li>
+            </ul>
+            <button class="nav-hamburger" id="nav-hamburger" aria-label="Abrir menú" aria-expanded="false">
+                <span class="hamburger-bar"></span>
+                <span class="hamburger-bar"></span>
+                <span class="hamburger-bar"></span>
+            </button>
+        </div>
+    </nav>
+
     <!-- Header Section -->
     <header>
         <div class="logo-container">
@@ -164,20 +183,28 @@
             </div>
         </div>
 
+        <!-- View Toggle (Grid / List) -->
+        <div class="view-toggle-container" id="view-toggle-container" style="display: none;">
+            <span class="view-toggle-count" id="view-toggle-count"></span>
+            <div class="view-toggle-buttons">
+                <button class="btn-view-toggle active" id="btn-view-grid" title="Vista tarjetas">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+                    Tarjetas
+                </button>
+                <button class="btn-view-toggle" id="btn-view-list" title="Vista lista">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                    Lista
+                </button>
+            </div>
+        </div>
+
         <!-- Search Results / Cards Grid -->
         <div class="cards-grid" id="cards-grid">
             <!-- El estado inicial es limpio. Se rellenará al buscar o al ver la lista completa. -->
         </div>
 
-        <!-- Botón para Cargar Más (Paginación) -->
-        <div class="load-more-container" id="load-more-container" style="display: none; text-align: center; margin-top: 2rem; margin-bottom: 2rem;">
-            <button class="btn btn-secondary" id="btn-load-more" style="padding: 0.8rem 2rem; font-size: 0.95rem; border-radius: 12px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem;">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-                Cargar más personas...
-            </button>
-        </div>
+        <!-- Paginación -->
+        <div class="pagination-container" id="pagination-container" style="display: none;"></div>
 
         <!-- Toggle Full List Button (Shown at the bottom when not viewing list) -->
         <div class="toggle-list-container" id="toggle-list-container">
@@ -365,7 +392,52 @@
 
     <!-- Footer -->
     <footer>
-        <p>&copy; 2026 AQUIESTOYVENEZUELA.COM. Plataforma ciudadana para la localización y búsqueda de personas.</p>
+        <div class="footer-inner">
+            <div class="footer-grid">
+
+                <div class="footer-col">
+                    <h4 class="footer-heading">Aquí Estoy Venezuela</h4>
+                    <p class="footer-text">Plataforma ciudadana de código abierto para el reporte, búsqueda y localización de personas en Venezuela. Sin fines de lucro, construida por la comunidad.</p>
+                    <div class="footer-flag-dots">
+                        <span class="footer-dot yellow"></span>
+                        <span class="footer-dot blue"></span>
+                        <span class="footer-dot red"></span>
+                    </div>
+
+                    <div class="footer-clock">
+                        <div class="footer-clock-label">Tiempo desde el sismo</div>
+                        <div class="footer-clock-display" id="footer-elapsed-clock">---</div>
+                        <div class="footer-clock-sub">24 jun 2026 · 18:04 VET · M7.5</div>
+                    </div>
+                </div>
+
+                <div class="footer-col">
+                    <h4 class="footer-heading">Recursos</h4>
+                    <ul class="footer-links">
+                        <li>
+                            <a href="https://github.com/aquiestoyvenezuela/aquiestoyvenezuela-web" target="_blank" rel="noopener" class="footer-link-github">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+                                Repositorio en GitHub
+                            </a>
+                        </li>
+                        <li><a href="https://github.com/aquiestoyvenezuela/aquiestoyvenezuela-web/blob/main/README.md" target="_blank" rel="noopener">Documentación</a></li>
+                        <li><a href="https://github.com/aquiestoyvenezuela/aquiestoyvenezuela-web/issues" target="_blank" rel="noopener">Reportar un problema</a></li>
+                        <li><a href="/admin" class="footer-link-admin">Administración</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4 class="footer-heading">¿Quieres Colaborar?</h4>
+                    <p class="footer-text">Este proyecto es de código abierto. Puedes contribuir con código, reportar errores, traducir contenido o ayudar a difundir la plataforma.</p>
+                    <a href="https://github.com/aquiestoyvenezuela/aquiestoyvenezuela-web/pulls" target="_blank" rel="noopener" class="footer-cta">Contribuir en GitHub →</a>
+                </div>
+
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2026 AQUIESTOYVENEZUELA.COM. Plataforma ciudadana para la localización y búsqueda de personas en Venezuela.</p>
+            </div>
+        </div>
     </footer>
 
     <!-- Scripts de Supabase, PapaParse y Lógica Local -->
@@ -373,5 +445,26 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="static/js/config.js?v=6"></script>
     <script src="static/js/app.js?v=11"></script>
+    <script>
+        (function () {
+            var DISASTER = new Date('2026-06-24T22:04:00Z'); // 18:04 VET (UTC-4)
+            var el = document.getElementById('footer-elapsed-clock');
+            function tick() {
+                var diff = Math.floor((Date.now() - DISASTER.getTime()) / 1000);
+                if (diff < 0) { el.textContent = '00d 00:00:00'; return; }
+                var d = Math.floor(diff / 86400);
+                var h = Math.floor((diff % 86400) / 3600);
+                var m = Math.floor((diff % 3600) / 60);
+                var s = diff % 60;
+                el.textContent =
+                    String(d).padStart(3, '0') + 'd ' +
+                    String(h).padStart(2, '0') + ':' +
+                    String(m).padStart(2, '0') + ':' +
+                    String(s).padStart(2, '0');
+            }
+            tick();
+            setInterval(tick, 1000);
+        })();
+    </script>
 </body>
 </html>
